@@ -25,7 +25,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     fullname = Column(String(255), nullable=False)
     username = Column(String(255), unique=True, index=True, nullable=False)
-    password = Column(String(255), nullable=False) # Simpan password yang sudah di-hash
+    password = Column(String(255), nullable=True)
     company = Column(String(255), nullable=True)
     gender = Column(String(50), nullable=True)
     age = Column(Integer, nullable=True)
@@ -34,6 +34,8 @@ class User(Base):
     test_location = Column(String(255), nullable=True)
     roles = Column(Enum('admin', 'user', name='user_roles_enum'), default='user')
     conclusions = Column(Text, nullable=True)
+    report = Column(String(255), nullable=True)
+    jobs = Column(String(255), nullable=True)
     note_jobs = Column(String(255), nullable=True)
 
     # --- RELASI ONE-TO-MANY ---
