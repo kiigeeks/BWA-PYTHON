@@ -8,18 +8,18 @@ import models
 
 # --- Data untuk tabel 'tests' ---
 TEST_DATA = [
-    {"name": "Kraeplin"},
-    {"name": "WSCT"},
-    {"name": "Digit_Span"},
+    {"name": "Kraeplin", "title": "Ingatan Kerja Kuat", "description": "Punya kemampuan bagus untuk menyimpan dan mengolah informasi secara cepat di pikiran"},
+    {"name": "WSCT", "title": "Logika Kuat", "description": "Kemampuan menganalisis data/info dengan baik dan efisien dalam menyelesaikan tantangan"},
+    {"name": "Digit_Span", "title": "Ingatan Jangka Pendek Kuat", "description": "Mampu menangkap banyak info sekaligus dalam waktu singkat, sehingga pandai mengambil keputusan cepat atau tangkap instruksi kompleks"},
 ]
 
 # --- Data untuk tabel 'personalities' ---
 PERSONALITY_DATA = [
-    {"name": "Openess", "title": "Keterbukaan terhadap Pengalaman Baru", "description": "Kreatif: punya banyak ide unit & solusi" + '"out of the box"' + ""},
-    {"name": "Conscientiousness"},
-    {"name": "Extraversion"},
-    {"name": "Agreeableness"},
-    {"name": "Neuroticism"},
+    {"name": "Openess", "title": "Keterbukaan terhadap Pengalaman Baru", "description": "Kreatif: punya banyak ide unik & solusi " + '"out of the box"' + ", suka mencoba hal baru,", "explanation": "X memiliki kecenderungann untuk terbuka terhadap aspek penalaran dan seni. Selain itu ia juga cenderung kreatif dan memiliki ketertarikan terhadap banyak hal"},
+    {"name": "Conscientiousness", "title": "Kecenderungan Teliti & Disiplin", "description": "Rapi & terorganisir dalam bekerja, bisa diandalkan untuk tugas detail, rajin dan konsisten menyelesaikan pekerjaan", "explanation": "X memiliki kecenderungan terhadap keteraturan dalam mengerjakan tugas. Selain itu X juga cenderung tekun dan terorganisir dalam bekerja"},
+    {"name": "Extraversion", "title": "Kepribadian sosial dan energik", "description": "Cenderung menikmati interaksi sosial dan merasa nyaman dalam situasi yang melibatkan banyak orang", "explanation": "X merupakan orang dengan preferensi untuk aktif dan energetik secara sosial, Tidak jarang juga jika ia suka untuk berbicara dan nyaman bekerja dalam kelompok"},
+    {"name": "Agreeableness", "title": "Sifat Mudah Akur & Peduli", "description": "Pribadi yang sangat pengertian, empatik, suka menolong, dan mudah bekerjasama", "explanation": "X merupakan orang dengan kecenderungan untuk dikenal baik karena kehangatan dan keramahannya terhadap sesame. Tak jarang ia juga dikenal kooperatif."},
+    {"name": "Neuroticism", "title": "Kecenderungan Emosi Kuat", "description": "Sangat responsif terhadap hal-hal yang memicu emosi negatif(seperti rasa khawatir, takut, atau frustasi)", "explanation": "X adalah orang yang memilki tendensi stabilitas emosional yang tidak terlalu baikdan terkadang mungkin mencemaskan beberapa hal. Tidak jarang ia juga dikenal orang yang sensitif"},
 ]
 
 # --- Data untuk tabel 'stimulations' ---
