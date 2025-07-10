@@ -1,0 +1,41 @@
+# ==================================
+# FILE RAHASIA & LINGKUNGAN
+# ==================================
+# Abaikan file environment yang berisi password dan secret key.
+# Ini adalah yang paling penting!
+.env
+
+# Abaikan folder virtual environment Python.
+# Folder ini berisi library yang diinstall dan ukurannya besar.
+.venv/
+venv/
+env/
+
+
+# ==================================
+# FILE & FOLDER BUATAN PYTHON
+# ==================================
+# Abaikan folder cache yang dibuat otomatis oleh Python.
+__pycache__/
+*.pyc
+
+
+# ==================================
+# FILE & FOLDER SPESIFIK PROYEK
+# ==================================
+# Abaikan database lokal jika Anda menggunakan SQLite.
+*.db
+*.sqlite3
+
+# Abaikan folder untuk file upload sementara dan hasil analisis.
+# Repositori hanya perlu menyimpan kode, bukan data yang di-generate.
+/temp_uploads/
+/hasil_analisis/
+
+
+# ==================================
+# FILE KONFIGURASI EDITOR/IDE
+# ==================================
+# Abaikan folder konfigurasi dari editor kode populer.
+.vscode/
+.idea/
