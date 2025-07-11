@@ -307,10 +307,17 @@ import mysql.connector
 # --- Analisis dan visualisasi tetap sama ---
 # (semua fungsi dari create_cleaning_csv sampai generate_line_plot_all_sessions tidak diubah)
 
+import bcrypt  # ← Tambahkan ini di bagian import teratas
+
 def create_user_and_return_id(data):
     """
     Simpan data user ke tabel `users` dan kembalikan ID yang baru dibuat.
+    Password akan di-hash sebelum disimpan.
     """
+    # Hash password
+    password_bytes = data['password'].encode('utf-8')
+    hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
+
     conn = mysql.connector.connect(
         host="localhost",
         user="root",
@@ -325,7 +332,7 @@ def create_user_and_return_id(data):
     """, (
         data['fullname'],
         data['username'],
-        data['password'],
+        hashed_password,  # ← Gunakan password yang sudah di-hash
         data['company'],
         data['gender'],
         data['age'],
