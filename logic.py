@@ -136,7 +136,7 @@ def analyze_response_during_test(csv):
 
     return formatted.astype(float).reset_index().rename(columns={'index': 'CATEGORY'}).to_dict(orient='records')
 
-def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/topoplots"):
+def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/topoplots", username="default"):
     import os
     import matplotlib.pyplot as plt
     import mne
@@ -216,17 +216,22 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
         cbar.set_label('Nilai Normalisasi (ReRaw)')
         plt.subplots_adjust(top=0.85, bottom=0.2)
 
-        output_file = os.path.join(output_dir, f"topoplot_{session_name.lower()}.png")
+        filename = f"{username}_topoplot_{session_name.lower()}.png"
+        output_file = os.path.join(output_dir, filename)
+
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
+        
+def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="static/lineplots", username="default"):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import os
 
-def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="static/lineplots"):
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load data
     df = pd.read_csv(cleaning2_path)
 
-    # Daftar sesi dan index range (masing-masing 480 titik)
     sessions = [
         'OPEN EYES', 'CLOSED EYES', 'AUTOBIOGRAPHY',
         'OPENNESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION',
@@ -264,7 +269,6 @@ def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="
         x_labels = ['AF3', 'T7', 'PZ', 'AF4', 'T8', 'Score Left', 'Score Right']
         x_pos = np.arange(len(x_labels))
 
-        # Ambil nilai untuk plotting
         band_values = {
             band: [
                 session_data['AF3'][band], session_data['T7'][band],
@@ -273,7 +277,6 @@ def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="
             ] for band in freq_bands
         }
 
-        # Plot
         plt.figure(figsize=(12, 8))
         colors = {'Theta': 'cyan', 'Alpha': 'magenta', 'BetaL': 'green', 'BetaH': 'red', 'Gamma': 'blue'}
 
@@ -290,16 +293,16 @@ def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 
-        # Save image
         safe_session = session.lower().replace(" ", "_")
-        output_file = os.path.join(output_dir, f"lineplot_{safe_session}.png")
+        filename = f"{username}_lineplot_{safe_session}.png"
+        output_file = os.path.join(output_dir, filename)
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
 
-        # Tambahkan URL ke dictionary
         lineplot_urls[session] = f"http://127.0.0.1:8000/{output_file}"
 
     return lineplot_urls
+
 
 import os
 import pandas as pd
@@ -348,7 +351,7 @@ def create_user_and_return_id(data):
 # ======================
 # 4. RUN ANALYSIS UTAMA
 # ======================
-def run_full_analysis(path: str, user_id: int):
+def run_full_analysis(path: str, user_id: int, username: str):
     create_cleaning_csv(path)
     create_cleaning2_csv(path)
 
@@ -358,11 +361,11 @@ def run_full_analysis(path: str, user_id: int):
     accuracy = analyze_personality_accuracy("cleaning2.csv")
     response = analyze_response_during_test("cleaning.csv")
 
-    generate_all_topoplots("cleaning2.csv")
-    lineplot_urls = generate_line_plot_all_sessions("cleaning2.csv")
+    generate_all_topoplots("cleaning2.csv", username=username)
+    lineplot_urls = generate_line_plot_all_sessions("cleaning2.csv", username=username)
 
     topoplot_urls = {
-        s.upper(): f"http://127.0.0.1:8000/static/topoplots/topoplot_{s}.png"
+        s.upper(): f"http://127.0.0.1:8000/static/topoplots/{username}_topoplot_{s}.png"
         for s in ['kraepelin_test', 'wcst', 'digit_span','openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']
     }
 
