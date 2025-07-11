@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
+from auth import get_password_hash # <- 1. Import fungsi untuk hash password
 
 # ==============================================================================
 #  DATA MASTER YANG AKAN DI-INSERT
@@ -35,6 +36,22 @@ STIMULATION_DATA = [
     {"name": "Kraeplin", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "WSCT", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Digit_Span", "title_graph": "Cognitive Function Test - Digit Span"},
+]
+
+# --- 2. Data untuk Akun Admin ---
+ADMIN_USER_DATA = [
+    {
+        "fullname": "Admin Utama",
+        "username": "admin",
+        "password": "password123",
+        "roles": "admin"
+    },
+    {
+        "fullname": "Admin Cadangan",
+        "username": "admin2",
+        "password": "password456",
+        "roles": "admin"
+    }
 ]
 
 
@@ -74,6 +91,23 @@ def seed_data():
                 db.add(models.Stimulation(**data))
         db.commit()
         print("✅ Data 'stimulations' berhasil dimasukkan.")
+
+        # --- 3. Proses insert untuk Admin ---
+        print("\n🌱 Memasukkan data admin ke tabel 'users'...")
+        for data in ADMIN_USER_DATA:
+            exists = db.query(models.User).filter_by(username=data["username"]).first()
+            if not exists:
+                # Hash password sebelum disimpan
+                hashed_password = get_password_hash(data["password"])
+                admin_user = models.User(
+                    fullname=data["fullname"],
+                    username=data["username"],
+                    password=hashed_password, # Gunakan password yang sudah di-hash
+                    roles=data["roles"]
+                )
+                db.add(admin_user)
+        db.commit()
+        print("✅ Data admin berhasil dimasukkan.")
         
         print("\n🎉 Semua data master berhasil di-seed ke database.")
 
