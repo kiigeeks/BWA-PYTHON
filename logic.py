@@ -307,48 +307,6 @@ import mysql.connector
 # --- Analisis dan visualisasi tetap sama ---
 # (semua fungsi dari create_cleaning_csv sampai generate_line_plot_all_sessions tidak diubah)
 
-import bcrypt  # ← Tambahkan ini di bagian import teratas
-
-def create_user_and_return_id(data):
-    """
-    Simpan data user ke tabel `users` dan kembalikan ID yang baru dibuat.
-    Password akan di-hash sebelum disimpan.
-    """
-    # Hash password
-    password_bytes = data['password'].encode('utf-8')
-    hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
-
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",
-        database="brainwave_db"
-    )
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO users (fullname, username, password, company, gender, age, address, test_date, test_location)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        data['fullname'],
-        data['username'],
-        hashed_password,  # ← Gunakan password yang sudah di-hash
-        data['company'],
-        data['gender'],
-        data['age'],
-        data['address'],
-        data['test_date'],
-        data['test_location']
-    ))
-
-    conn.commit()
-    user_id = cursor.lastrowid
-
-    cursor.close()
-    conn.close()
-
-    return user_id
-
 # ======================
 # 4. RUN ANALYSIS UTAMA
 # ======================
