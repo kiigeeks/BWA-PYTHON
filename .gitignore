@@ -31,6 +31,9 @@ __pycache__/
 # Repositori hanya perlu menyimpan kode, bukan data yang di-generate.
 /temp_uploads/
 /hasil_analisis/
+/__pycache__/
+/static/
+/uploads/
 
 
 # ==================================
@@ -39,3 +42,6 @@ __pycache__/
 # Abaikan folder konfigurasi dari editor kode populer.
 .vscode/
 .idea/
+
+.csv
+.edf
