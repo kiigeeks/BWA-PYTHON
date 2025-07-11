@@ -194,20 +194,14 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
                 avg_value = session_df[col_name].mean() if col_name in session_df else 0
                 raw_values.append(avg_value)
 
-            raw_values = np.array(raw_values)
-            mean = raw_values.mean()
-            std = raw_values.std()
-            normalized = (raw_values - mean) / std if std > 0 else np.zeros_like(raw_values)
-            if normalized.max() != normalized.min():
-                normalized = (normalized - normalized.min()) / (normalized.max() - normalized.min()) * 2
-            else:
-                normalized = np.ones_like(normalized)
+            vmin = np.min(raw_values) if raw_values else 0
+            vmax = np.max(raw_values) if raw_values else 1
 
-            im, *_ = mne.viz.plot_topomap(normalized, pos, axes=ax, show=False,
+            im, *_ = mne.viz.plot_topomap(raw_values, pos, axes=ax, show=False,
                                           cmap='jet', sphere=sphere, outlines='head')
             for idx, (x, y) in enumerate(pos):
                 ax.text(x, y, ch_names[idx], fontsize=8, ha='center', va='center', color='black')
-            im.set_clim(0, 2)
+            im.set_clim(0, vmax)
             ax.set_title(band)
             images.append(im)
 
