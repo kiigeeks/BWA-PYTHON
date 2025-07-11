@@ -3,13 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import uuid
 import os
+import shutil
 
 from logic import run_full_analysis, create_user_and_return_id
-from database import get_db  # get_db kalau kamu tetap pakai SQLAlchemy session
+from database import get_db
 
 app = FastAPI()
 
-# Middleware CORS
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,17 +31,9 @@ async def analyze_csv(
     address: str = Form(...),
     test_date: str = Form(...),
     test_location: str = Form(...),
-    db: Session = Depends(get_db)  # kalau kamu mau pakai SQLAlchemy
+    db: Session = Depends(get_db)
 ):
-    # 1. Simpan file CSV ke lokal
-    file_id = str(uuid.uuid4())
-    filename = f"{file_id}_{file.filename}"
-    file_path = os.path.join(".", filename)
-
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-
-    # 2. Simpan data user ke database
+    # 1. Simpan data user ke DB dan ambil user_id
     user_data = {
         "fullname": fullname,
         "username": username,
@@ -52,26 +45,27 @@ async def analyze_csv(
         "test_date": test_date,
         "test_location": test_location
     }
+    user_id = create_user_and_return_id(user_data)
+
+    # 2. Simpan file sementara
+    file_id = str(uuid.uuid4())
+    filename = f"{file_id}_{file.filename}"
+    file_path = os.path.join(".", filename)
+
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
 
     try:
-        user_id = create_user_and_return_id(user_data)
-
-        # 3. Jalankan analisis EEG
-        result = run_full_analysis(file_path, user_id)
-
-        return {
-            "message": "User created and analysis completed successfully",
-            "user_id": user_id,
-            "results": result
-        }
+        # 3. Jalankan analisis utama
+        result = run_full_analysis(file_path, user_id, username)
+        return result
 
     except Exception as e:
         return {"error": str(e)}
 
     finally:
         # 4. Hapus file sementara
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        for temp in ["cleaning.csv", "cleaning2.csv"]:
-            if os.path.exists(temp):
-                os.remove(temp)
+        os.remove(file_path)
+        for temp_file in ["cleaning.csv", "cleaning2.csv"]:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
