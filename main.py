@@ -6,6 +6,7 @@ from typing import Annotated
 import uuid
 import os
 import shutil
+from auth import get_current_user
 
 # Import dari file lokal
 from logic import run_full_analysis
@@ -133,7 +134,7 @@ async def analyze_csv(
 # ENDPOINT UNTUK GET USER BY ID (DENGAN RELASI)
 # ==================================
 @app.get("/users/{user_id}", response_model=schemas.User, summary="Get User by ID with All Relations")
-async def read_user(user_id: int, db: Session = Depends(get_db)):
+async def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Mengambil data seorang pengguna berdasarkan ID beserta semua data relasinya.
     """
