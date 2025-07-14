@@ -105,3 +105,55 @@ class User(BaseModel):
 
     class Config:
         from_attributes = True
+
+class Token(BaseModel):
+    message: str
+    access_token: str
+    token_type: str
+
+class AnalysisBigFive(BaseModel):
+    PERSONALITY: str
+    ENGAGEMENT: float
+    EXCITEMENT: float
+    INTEREST: float
+    SCORE: float
+    BRIEF_EXPLANATION: str
+
+class AnalysisCognitive(BaseModel):
+    TEST: str
+    ENGAGEMENT: float
+    EXCITEMENT: float
+    INTEREST: float
+    SCORE: float
+
+class AnalysisSplitBrain(BaseModel):
+    TEST: str
+    LEFT_HEMISPHERE: float
+    RIGHT_HEMISPHERE: float
+
+class AnalysisPersonalityAccuracy(BaseModel):
+    PERSONALITY: str
+    AF3: float
+    T7: float
+    Pz: float
+    T8: float
+    AF4: float
+    AVERAGE: float
+
+class AnalysisResponse(BaseModel):
+    CATEGORY: str
+    ATTENTION: float
+    STRESS: float
+    RELAX: float
+    FOCUS: float
+
+# DITAMBAH: Skema utama yang menggabungkan semua hasil
+class AnalysisResult(BaseModel):
+    big_five: List[AnalysisBigFive]
+    cognitive_function: List[AnalysisCognitive]
+    split_brain: List[AnalysisSplitBrain]
+    personality_accuracy: List[AnalysisPersonalityAccuracy]
+    response_during_test: List[AnalysisResponse]
+    topoplot_urls: dict[str, str]
+    lineplot_urls: dict[str, str]
+
