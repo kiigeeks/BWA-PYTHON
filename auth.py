@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-
+from database import get_db
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -48,20 +48,42 @@ import schemas
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/users/login")
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """
+    Fungsi yang sudah dimodifikasi dengan print untuk debug.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # --- MULAI BAGIAN DEBUG ---
+    print("\n===================================")
+    print("--- DEBUG: Memvalidasi token...")
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
+        print(f"--- DEBUG: Token berhasil di-decode. Username dari token: '{username}'")
+
         if username is None:
+            print("--- DEBUG GAGAL: Klaim 'sub' (username) tidak ditemukan di dalam token.")
             raise credentials_exception
-    except JWTError:
+            
+    except JWTError as e:
+        print(f"--- DEBUG GAGAL: Terjadi error saat decode token JWT. Detail: {e}")
         raise credentials_exception
     
+    # Cari user di database berdasarkan username dari token
     user = get_user(db, username=username)
+    print(f"--- DEBUG: Mencari user '{username}' di database...")
+    
     if user is None:
+        print(f"--- DEBUG GAGAL: User '{username}' TIDAK DITEMUKAN di database.")
         raise credentials_exception
+    
+    print(f"--- DEBUG BERHASIL: User '{username}' ditemukan. Autentikasi sukses.")
+    print("===================================\n")
+    # --- AKHIR BAGIAN DEBUG ---
+    
     return user

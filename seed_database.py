@@ -9,9 +9,9 @@ from auth import get_password_hash # <- 1. Import fungsi untuk hash password
 
 # --- Data untuk tabel 'tests' ---
 TEST_DATA = [
-    {"name": "Kraeplin", "title": "Ingatan Kerja Kuat", "description": "Punya kemampuan bagus untuk menyimpan dan mengolah informasi secara cepat di pikiran"},
-    {"name": "WSCT", "title": "Logika Kuat", "description": "Kemampuan menganalisis data/info dengan baik dan efisien dalam menyelesaikan tantangan"},
-    {"name": "Digit_Span", "title": "Ingatan Jangka Pendek Kuat", "description": "Mampu menangkap banyak info sekaligus dalam waktu singkat, sehingga pandai mengambil keputusan cepat atau tangkap instruksi kompleks"},
+    {"name": "Kraepelin", "title": "Ingatan Kerja Kuat", "description": "Punya kemampuan bagus untuk menyimpan dan mengolah informasi secara cepat di pikiran"},
+    {"name": "WCST", "title": "Logika Kuat", "description": "Kemampuan menganalisis data/info dengan baik dan efisien dalam menyelesaikan tantangan"},
+    {"name": "Digit Span", "title": "Ingatan Jangka Pendek Kuat", "description": "Mampu menangkap banyak info sekaligus dalam waktu singkat, sehingga pandai mengambil keputusan cepat atau tangkap instruksi kompleks"},
 ]
 
 # --- Data untuk tabel 'personalities' ---
@@ -25,17 +25,17 @@ PERSONALITY_DATA = [
 
 # --- Data untuk tabel 'stimulations' ---
 STIMULATION_DATA = [
-    {"name": "Open_Eyes", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Closed_Eyes", "title_graph": "Cognitive Function Test - Digit Span"},
+    {"name": "Open Eyes", "title_graph": "Cognitive Function Test - Digit Span"},
+    {"name": "Closed Eyes", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Autobiography", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Openess", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Conscientiousness", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Extraversion", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Agreeableness", "title_graph": "Cognitive Function Test - Digit Span"},
     {"name": "Neuroticism", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Kraeplin", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "WSCT", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Digit_Span", "title_graph": "Cognitive Function Test - Digit Span"},
+    {"name": "Kraepelin", "title_graph": "Cognitive Function Test - Digit Span"},
+    {"name": "WCST", "title_graph": "Cognitive Function Test - Digit Span"},
+    {"name": "Digit Span", "title_graph": "Cognitive Function Test - Digit Span"},
 ]
 
 # --- 2. Data untuk Akun Admin ---

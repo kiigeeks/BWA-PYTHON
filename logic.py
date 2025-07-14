@@ -425,7 +425,7 @@ def save_to_mysql(results, user_id):
         'OPEN EYES': 1,
         'CLOSED EYES': 2,
         'AUTOBIOGRAPHY': 3,
-        'OPENESS': 4,  # typo di spelling
+        'OPENESS': 4,
         'CONSCIENTIOUSNESS': 5,
         'EXTRAVERSION': 6,
         'AGREEABLENESS': 7,

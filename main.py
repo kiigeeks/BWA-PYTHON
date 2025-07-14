@@ -54,11 +54,12 @@ async def login_for_access_token(
     )
     
     # 4. Kirim respons sukses
+    # Di dalam main.py, fungsi login_for_access_token
+
     return {
-        "status": "Login successful",
-        "payload": {
-            "access_token": access_token,
-        }
+        "status": "login successful",
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
 # ==================================
