@@ -5,6 +5,14 @@ from dotenv import load_dotenv
 # Memuat variabel dari file .env ke environment
 load_dotenv()
 
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "database": os.getenv("DB_NAME"),
+}
+
+BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
 # --- Pengaturan Database ---
 DATABASE_URL = os.getenv("DATABASE_URL")
 

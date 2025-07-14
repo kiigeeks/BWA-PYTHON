@@ -293,7 +293,7 @@ def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
 
-        lineplot_urls[session] = f"http://127.0.0.1:8000/{output_file}"
+        lineplot_urls[session] = f"{BASE_URL}/{output_file}"
 
     return lineplot_urls
 
@@ -311,6 +311,7 @@ import mysql.connector
 # 4. RUN ANALYSIS UTAMA
 # ======================
 def run_full_analysis(path: str, user_id: int, username: str):
+    from config import BASE_URL
     create_cleaning_csv(path)
     create_cleaning2_csv(path)
 
@@ -324,7 +325,7 @@ def run_full_analysis(path: str, user_id: int, username: str):
     lineplot_urls = generate_line_plot_all_sessions("cleaning2.csv", username=username)
 
     topoplot_urls = {
-        s.upper(): f"http://127.0.0.1:8000/static/topoplots/{username}_topoplot_{s}.png"
+        s.upper(): f"{BASE_URL}/static/topoplots/{username}_topoplot_{s}.png"
         for s in ['kraepelin_test', 'wcst', 'digit_span','openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']
     }
 
@@ -344,16 +345,12 @@ def run_full_analysis(path: str, user_id: int, username: str):
 # ======================
 # 5. SAVE KE DATABASE BARU (SESUAI ERD BARU)
 # ======================
+from config import BASE_URL, DB_CONFIG
+
 def save_to_mysql(results, user_id):
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",
-        database="brainwave_db"
-    )
+    conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    # Ambil nama user untuk digunakan sebagai prefix nama file
     cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
     user_row = cursor.fetchone()
     if not user_row:
@@ -361,55 +358,31 @@ def save_to_mysql(results, user_id):
         return {"error": f"User with id {user_id} not found"}
     username = user_row[0].lower().replace(" ", "_")
 
-    # BIG FIVE
-    for row in results['big_five']:
-        cursor.execute("SELECT id FROM personalities WHERE name = %s", (row['PERSONALITY'],))
-        pid = cursor.fetchone()
-        if not pid: continue
-        personality_id = pid[0]
+    # ======= PERSONALITY ID FIXED =======
+    personality_ids = {
+        'OPENNESS': 1,
+        'CONSCIENTIOUSNESS': 2,
+        'EXTRAVERSION': 3,
+        'AGREEABLENESS': 4,
+        'NEUROTICISM': 5
+    }
 
+    for row in results['big_five']:
+        personality_id = personality_ids.get(row['PERSONALITY'].upper())
+        if not personality_id:
+            continue
         cursor.execute("""
             INSERT INTO user_personalities (user_id, personality_id, engagement, excitement, interest, score, brain_topography)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
-            user_id, personality_id, row['ENGAGEMENT'], row['EXCITEMENT'], row['INTEREST'], row['SCORE'], f"{username}_topoplot_{row['PERSONALITY'].lower()}.png"
+            user_id, personality_id, row['ENGAGEMENT'], row['EXCITEMENT'], row['INTEREST'], row['SCORE'],
+            f"{username}_topoplot_{row['PERSONALITY'].lower()}.png"
         ))
 
-    # COGNITIVE FUNCTION
-    for row in results['cognitive_function']:
-        cursor.execute("SELECT id FROM tests WHERE name = %s", (row['TEST'],))
-        tid = cursor.fetchone()
-        if not tid: continue
-        test_id = tid[0]
-
-        cursor.execute("""
-            INSERT INTO user_cognitive (user_id, test_id, engagement, excitement, interest, score, brain_topography)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            user_id, test_id, row['ENGAGEMENT'], row['EXCITEMENT'], row['INTEREST'], row['SCORE'], f"{username}_topoplot_{row['TEST'].lower().replace(' ', '_')}.png"
-        ))
-
-    # SPLIT BRAIN
-    for row in results['split_brain']:
-        cursor.execute("SELECT id FROM tests WHERE name = %s", (row['TEST'],))
-        tid = cursor.fetchone()
-        if not tid: continue
-        test_id = tid[0]
-
-        cursor.execute("""
-            INSERT INTO user_split_brain (user_id, test_id, `left`, `right`)
-            VALUES (%s, %s, %s, %s)
-        """, (
-            user_id, test_id, row['LEFT_HEMISPHERE'], row['RIGHT_HEMISPHERE']
-        ))
-
-    # PERSONALITY ACCURACY
     for row in results['personality_accuracy']:
-        cursor.execute("SELECT id FROM personalities WHERE name = %s", (row['PERSONALITY'],))
-        pid = cursor.fetchone()
-        if not pid: continue
-        personality_id = pid[0]
-
+        personality_id = personality_ids.get(row['PERSONALITY'].upper())
+        if not personality_id:
+            continue
         cursor.execute("""
             INSERT INTO user_personality_accuracies (user_id, personality_id, AF3, T7, Pz, T8, AF4, average)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -417,13 +390,55 @@ def save_to_mysql(results, user_id):
             user_id, personality_id, row['AF3'], row['T7'], row['Pz'], row['T8'], row['AF4'], row['AVERAGE']
         ))
 
-    # RESPONSE
-    for row in results['response_during_test']:
-        cursor.execute("SELECT id FROM stimulations WHERE name = %s", (row['CATEGORY'],))
-        stim = cursor.fetchone()
-        if not stim: continue
-        stim_id = stim[0]
+    # ======= TEST ID FIXED =======
+    test_ids = {
+        'KRAEPELIN TEST': 1,
+        'WCST': 2,
+        'DIGIT SPAN': 3
+    }
 
+    for row in results['cognitive_function']:
+        test_id = test_ids.get(row['TEST'].upper())
+        if not test_id:
+            continue
+        cursor.execute("""
+            INSERT INTO user_cognitive (user_id, test_id, engagement, excitement, interest, score, brain_topography)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            user_id, test_id, row['ENGAGEMENT'], row['EXCITEMENT'], row['INTEREST'], row['SCORE'],
+            f"{username}_topoplot_{row['TEST'].lower().replace(' ', '_')}.png"
+        ))
+
+    for row in results['split_brain']:
+        test_id = test_ids.get(row['TEST'].upper())
+        if not test_id:
+            continue
+        cursor.execute("""
+            INSERT INTO user_split_brain (user_id, test_id, `left`, `right`)
+            VALUES (%s, %s, %s, %s)
+        """, (
+            user_id, test_id, row['LEFT_HEMISPHERE'], row['RIGHT_HEMISPHERE']
+        ))
+
+    # ======= STIMULATION ID FIXED =======
+    stimulation_ids = {
+        'OPEN EYES': 1,
+        'CLOSED EYES': 2,
+        'AUTOBIOGRAPHY': 3,
+        'OPENESS': 4,  # typo di spelling
+        'CONSCIENTIOUSNESS': 5,
+        'EXTRAVERSION': 6,
+        'AGREEABLENESS': 7,
+        'NEUROTICISM': 8,
+        'KRAEPELIN TEST': 9,
+        'WCST': 10,
+        'DIGIT SPAN': 11
+    }
+
+    for row in results['response_during_test']:
+        stim_id = stimulation_ids.get(row['CATEGORY'].upper())
+        if not stim_id:
+            continue
         cursor.execute("""
             INSERT INTO user_response (user_id, stimulation_id, attention, stress, relax, focus, graph)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
