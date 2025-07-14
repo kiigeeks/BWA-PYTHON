@@ -119,7 +119,7 @@ async def analyze_csv(
 
     try:
         # 4. Jalankan analisis utama
-        result = run_full_analysis(file_path, user_id, username)
+        result = run_full_analysis(file_path, user_id, username, db)
         return result
 
     except Exception as e:
