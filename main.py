@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, status
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session, joinedload
@@ -15,6 +16,12 @@ import schemas
 from auth import create_access_token, get_password_hash, verify_password, get_user
 
 app = FastAPI()
+
+# Create static directory if it doesn't exist
+os.makedirs("static", exist_ok=True) 
+
+# Mount the static directory to be served at /static
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # CORS middleware
 app.add_middleware(
