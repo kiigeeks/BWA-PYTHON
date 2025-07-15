@@ -145,7 +145,12 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
 
     os.makedirs(output_dir, exist_ok=True)
 
-    df = pd.read_csv(cleaning2_path)
+    try:
+        df = pd.read_csv(cleaning2_path)
+    except FileNotFoundError:
+        print(f"Error: File '{cleaning2_path}' tidak ditemukan.")
+        return
+        
     ch_names = ['AF3', 'T7', 'Pz', 'T8', 'AF4']
     info = mne.create_info(ch_names=ch_names, sfreq=256, ch_types='eeg')
     montage = mne.channels.make_standard_montage('standard_1020')
@@ -155,13 +160,10 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
     pos = np.array([[p[0], p[1]] for p in pos3d])
     sphere = np.array([0., 0., 0., 0.095])
 
-    # Gabungkan semua sesi (cognitive + big five)
     sessions = {
-        # Cognitive Function Test
         'KRAEPELIN_TEST': (3840, 4320),
         'WCST': (4320, 4800),
         'DIGIT_SPAN': (4800, 5280),
-        # Big Five
         'OPENESS': (1440, 1920),
         'CONSCIENTIOUSNESS': (1920, 2400),
         'EXTRAVERSION': (2400, 2880),
@@ -183,38 +185,42 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
         if session_df.empty:
             continue
 
-        fig, axes = plt.subplots(1, 5, figsize=(15, 4))
-        images = []
+        # Buat figure. Ukuran diubah untuk memberi ruang bagi colorbar
+        fig, axes = plt.subplots(1, 5, figsize=(25, 6))
 
         for i, band in enumerate(bands):
             ax = axes[i]
             raw_values = []
             for ch in ch_names:
                 col_name = column_mapping[ch][i]
-                avg_value = session_df[col_name].mean() if col_name in session_df else 0
+                avg_value = session_df.get(col_name, pd.Series(0)).mean()
                 raw_values.append(avg_value)
-
-            vmin = np.min(raw_values) if raw_values else 0
-            vmax = np.max(raw_values) if raw_values else 1
-
-            im, *_ = mne.viz.plot_topomap(raw_values, pos, axes=ax, show=False,
-                                          cmap='jet', sphere=sphere, outlines='head')
+            
+            # Buat topoplot
+            im, _ = mne.viz.plot_topomap(raw_values, pos, axes=ax, show=False,
+                                         cmap='jet', sphere=sphere, outlines='head')
+            
+            # Tambahkan label channel
             for idx, (x, y) in enumerate(pos):
-                ax.text(x, y, ch_names[idx], fontsize=8, ha='center', va='center', color='black')
-            im.set_clim(0, vmax)
-            ax.set_title(band)
-            images.append(im)
+                ax.text(x, y, ch_names[idx], fontsize=9, ha='center', va='center', color='black')
+            
+            ax.set_title(band, fontsize=12)
 
-        cbar_ax = fig.add_axes([0.3, 0.1, 0.4, 0.05])
-        cbar = fig.colorbar(images[0], cax=cbar_ax, orientation='horizontal')
-        cbar.set_label('Nilai Normalisasi (ReRaw)')
-        plt.subplots_adjust(top=0.85, bottom=0.2)
+            # --- PERUBAHAN KUNCI: Buat colorbar untuk SETIAP plot (ax) ---
+            cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.8)
+            cbar.set_label('Power (μV²)', fontsize=10)
+            cbar.ax.tick_params(labelsize=8)
 
+        # Tambahkan judul utama dan atur layout
+        fig.suptitle(f'Topoplot Aktivitas Otak: {session_name}', fontsize=16, y=0.98)
+        plt.tight_layout(rect=[0, 0, 1, 0.95]) # Sesuaikan layout agar judul tidak tumpang tindih
+
+        # Simpan file
         filename = f"{username}_topoplot_{session_name.lower()}.png"
         output_file = os.path.join(output_dir, filename)
 
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.savefig(output_file, dpi=300)
+        plt.close(fig)
         
 def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="static/lineplots", username="default"):
     import numpy as np
