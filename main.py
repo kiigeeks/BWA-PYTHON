@@ -1,7 +1,6 @@
-# file: main.py
-
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import Annotated
 from sqlalchemy.orm import Session, joinedload
@@ -9,18 +8,15 @@ import uuid
 import os
 import shutil
 
-# Impor dari file-file lokal Anda
-# Ditambahkan verify_password ke dalam impor dari auth
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
 from logic import run_full_analysis
 from database import get_db, engine
 import models
 import schemas
-from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload
+from schemas import StandardResponse, AnalysisResult, User as UserSchema, TokenPayload
 from tools import convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from config import settings
 
-# Membuat semua tabel di database jika belum ada
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -31,7 +27,6 @@ app = FastAPI(
     redoc_url=None
 )
 
-# Perbaikan pada CORS: Pisahkan string menjadi list
 origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(',')]
 
 app.add_middleware(
@@ -46,25 +41,21 @@ app.add_middleware(
 async def read_root():
     return {"message": "BWA API is running and ready!"}
 
-# --- FUNGSI LOGIN YANG SEPENUHNYA DIPERBAIKI ---
 @app.post("/v1/bwa/users/login", summary="User Login", response_model=StandardResponse[TokenPayload], tags=["Users"])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
     db: Session = Depends(get_db)
 ):
     user = get_user(db, form_data.username)
-    # PERBAIKAN: Menggunakan verify_password dari auth, bukan schemas
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # PERBAIKAN: Menggunakan create_access_token dari auth, bukan schemas
     access_token = create_access_token(data={"sub": user.username, "user_id": user.id})
     return StandardResponse(message="Login berhasil", payload=TokenPayload(access_token=access_token, token_type="bearer"))
 
-# ... sisa endpoint lainnya tidak perlu diubah ...
 @app.post("/v1/bwa/analyze/", summary="Admin: Register Client and Analyze Data", response_model=StandardResponse[AnalysisResult], tags=["Analysis"])
 async def analyze_csv(db: Session = Depends(get_db), current_admin: models.User = Depends(get_current_user), file: UploadFile = File(...), fullname: str = Form(...), username: str = Form(...), password: str = Form(...), company: str = Form(...), gender: str = Form(...), age: int = Form(...), address: str = Form(...), test_date: str = Form(...), test_location: str = Form(...)):
     db_user = get_user(db, username)
@@ -93,26 +84,57 @@ async def analyze_csv(db: Session = Depends(get_db), current_admin: models.User 
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-@app.post("/v1/bwa/tools/edf-to-csv", summary="Convert EDF to a single CSV file", response_model=StandardResponse[FilePathPayload], tags=["Tools"])
+@app.post(
+    "/v1/bwa/tools/edf-to-csv", 
+    summary="Convert EDF to a single CSV file and download it", 
+    tags=["Tools"],
+    responses={
+        200: {
+            "content": {"text/csv": {}},
+            "description": "Returns the converted CSV file for download.",
+        }
+    }
+)
 async def convert_edf_to_csv_endpoint(file: UploadFile = File(...)):
     temp_file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(temp_file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     try:
         output_path = convert_edf_to_single_csv(temp_file_path, file.filename)
-        return StandardResponse(message="File EDF berhasil dikonversi menjadi satu file CSV.", payload=FilePathPayload(file_path=output_path))
+        
+        return FileResponse(
+            path=output_path,
+            media_type='text/csv',
+            filename=os.path.basename(output_path)
+        )
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-@app.post("/v1/bwa/tools/edf-to-ica-csv", summary="Process EDF with ICA and save to a single CSV", response_model=StandardResponse[FilePathPayload], tags=["Tools"])
+# --- ENDPOINT DIUBAH ---
+@app.post(
+    "/v1/bwa/tools/edf-to-ica-csv", 
+    summary="Process EDF with ICA and download the resulting CSV", 
+    tags=["Tools"],
+    responses={
+        200: {
+            "content": {"text/csv": {}},
+            "description": "Returns the ICA processed CSV file for download.",
+        }
+    }
+)
 async def process_edf_with_ica_endpoint(file: UploadFile = File(...)):
     temp_file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(temp_file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     try:
         output_path = process_edf_with_ica_to_csv(temp_file_path, file.filename)
-        return StandardResponse(message="File EDF berhasil diproses dengan ICA dan disimpan sebagai CSV.", payload=FilePathPayload(file_path=output_path))
+
+        return FileResponse(
+            path=output_path,
+            media_type='text/csv',
+            filename=os.path.basename(output_path)
+        )
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)

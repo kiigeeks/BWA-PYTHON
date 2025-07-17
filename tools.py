@@ -24,7 +24,9 @@ def convert_edf_to_single_csv(input_path: str, original_filename: str) -> str:
         raw = mne.io.read_raw_edf(input_path, preload=True, verbose=False)
         df = raw.to_data_frame()
         
-        base_filename = os.path.splitext(original_filename)[0]
+        filename_no_spaces = original_filename.replace(' ', '_')
+        
+        base_filename = os.path.splitext(filename_no_spaces)[0]
         output_filename = f"{base_filename}_converted.csv"
         output_path = os.path.join(OUTPUT_DIR, output_filename)
         
@@ -80,7 +82,9 @@ def process_edf_with_ica_to_csv(input_path: str, original_filename: str) -> str:
         # 7. Ekspor semua channel ke CSV
         df_cleaned = raw_full.to_data_frame()
         
-        base_filename = os.path.splitext(original_filename)[0]
+        filename_no_spaces = original_filename.replace(' ', '_')
+        
+        base_filename = os.path.splitext(filename_no_spaces)[0]
         output_filename = f"{base_filename}_ica_cleaned.csv"
         output_path = os.path.join(OUTPUT_DIR, output_filename)
         
