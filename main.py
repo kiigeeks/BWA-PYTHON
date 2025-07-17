@@ -42,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/v1/bwa/", tags=["Status"])
+@app.get("/", tags=["Status"])
 async def read_root():
     return {"message": "BWA API is running and ready!"}
 
