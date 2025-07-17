@@ -4,7 +4,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, sta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import Annotated
-from sqlalchemy.orm import Session, joinedload # <-- joinedload dipindah ke atas
+from sqlalchemy.orm import Session, joinedload
 import uuid
 import os
 import shutil
