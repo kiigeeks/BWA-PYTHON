@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
 from typing import Annotated
 from sqlalchemy.orm import Session, joinedload
 import uuid
@@ -13,7 +13,7 @@ from logic import run_full_analysis
 from database import get_db, engine
 import models
 import schemas
-from schemas import StandardResponse, AnalysisResult, User as UserSchema, TokenPayload
+from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload
 from tools import convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from config import settings
 
@@ -84,60 +84,55 @@ async def analyze_csv(db: Session = Depends(get_db), current_admin: models.User 
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-@app.post(
-    "/v1/bwa/tools/edf-to-csv", 
-    summary="Convert EDF to a single CSV file and download it", 
-    tags=["Tools"],
-    responses={
-        200: {
-            "content": {"text/csv": {}},
-            "description": "Returns the converted CSV file for download.",
-        }
-    }
-)
+@app.post("/v1/bwa/tools/edf-to-csv", summary="Convert EDF to a single CSV file", response_model=StandardResponse[FilePathPayload], tags=["Tools"])
 async def convert_edf_to_csv_endpoint(file: UploadFile = File(...)):
     temp_file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(temp_file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     try:
         output_path = convert_edf_to_single_csv(temp_file_path, file.filename)
-        
-        return FileResponse(
-            path=output_path,
-            media_type='text/csv',
-            filename=os.path.basename(output_path)
-        )
+        clean_path = output_path.replace('\\', '/')
+        return StandardResponse(message="File EDF berhasil dikonversi.", payload=FilePathPayload(file_path=clean_path))
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-# --- ENDPOINT DIUBAH ---
-@app.post(
-    "/v1/bwa/tools/edf-to-ica-csv", 
-    summary="Process EDF with ICA and download the resulting CSV", 
-    tags=["Tools"],
-    responses={
-        200: {
-            "content": {"text/csv": {}},
-            "description": "Returns the ICA processed CSV file for download.",
-        }
-    }
-)
+@app.post("/v1/bwa/tools/edf-to-ica-csv", summary="Process EDF with ICA and save to a single CSV", response_model=StandardResponse[FilePathPayload], tags=["Tools"])
 async def process_edf_with_ica_endpoint(file: UploadFile = File(...)):
     temp_file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(temp_file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     try:
         output_path = process_edf_with_ica_to_csv(temp_file_path, file.filename)
-
-        return FileResponse(
-            path=output_path,
-            media_type='text/csv',
-            filename=os.path.basename(output_path)
-        )
+        clean_path = output_path.replace('\\', '/')
+        return StandardResponse(message="File EDF berhasil diproses dengan ICA.", payload=FilePathPayload(file_path=clean_path))
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+@app.get(
+    "/v1/bwa/tools/download", 
+    summary="Download a generated file", 
+    tags=["Tools"],
+    responses={
+        200: {
+            "content": {"text/csv": {}},
+            "description": "Returns the requested file for download.",
+        },
+        404: {"description": "File not found"},
+    }
+)
+async def download_file(filepath: str):
+    full_path = filepath
+
+    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="File tidak ditemukan")
+
+    return FileResponse(
+        path=full_path,
+        media_type="text/csv",
+        filename=os.path.basename(full_path) # os.path.basename di sini aman untuk mengambil nama file saja
+    )
 
 @app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["Users"])
 async def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
