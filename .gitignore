@@ -43,5 +43,7 @@ __pycache__/
 .vscode/
 .idea/
 
-.csv
-.edf
+/output_files/
+
+*csv
+*edf

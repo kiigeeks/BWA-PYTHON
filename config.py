@@ -1,25 +1,27 @@
-# config.py
-import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
-# Memuat variabel dari file .env ke environment
-load_dotenv()
+class Settings(BaseSettings):
+    # Untuk koneksi SQLAlchemy (database.py)
+    DATABASE_URL: str
 
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST"),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-    "database": os.getenv("DB_NAME"),
-}
+    # Untuk koneksi langsung (logic.py)
+    DB_HOST: str
+    DB_PORT: int
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_NAME: str
 
-BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
-# --- Pengaturan Database ---
-DATABASE_URL = os.getenv("DATABASE_URL")
+    # Untuk otentikasi (auth.py)
+    SECRET_KEY: str
+    ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-# --- Pengaturan Otentikasi ---
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+    # Untuk aplikasi (main.py & logic.py)
+    BASE_URL: str
+    CORS_ORIGINS: str
 
-# --- Pengaturan Aplikasi ---
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(',')
+    class Config:
+        env_file = ".env"
+
+# Membuat satu objek 'settings' yang akan digunakan di seluruh aplikasi
+settings = Settings()

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import mysql.connector
 
 
+
 def create_cleaning_csv(path):
     df = pd.read_csv(path, header=1, low_memory=False)
     df.columns = df.columns.str.strip()
@@ -46,7 +47,7 @@ def analyze_big_five(csv):
     }
 
     big_five = formatted.loc[traits].copy()
-    big_five['BRIEF EXPLANATION'] = [explanations[t] for t in traits]
+    big_five['BRIEF_EXPLANATION'] = [explanations[t] for t in traits]
     return big_five.reset_index().rename(columns={'index': 'PERSONALITY'}).to_dict(orient='records')
 
 def analyze_cognitive_function(csv):
@@ -299,7 +300,7 @@ def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
 
-        lineplot_urls[session] = f"{BASE_URL}/{output_file}"
+        lineplot_urls[session] = f"{settings.BASE_URL}/{output_file}"
 
     return lineplot_urls
 
@@ -317,7 +318,7 @@ import mysql.connector
 # 4. RUN ANALYSIS UTAMA
 # ======================
 def run_full_analysis(path: str, user_id: int, username: str):
-    from config import BASE_URL
+    from config import settings
     create_cleaning_csv(path)
     create_cleaning2_csv(path)
 
@@ -331,7 +332,7 @@ def run_full_analysis(path: str, user_id: int, username: str):
     lineplot_urls = generate_line_plot_all_sessions("cleaning2.csv", username=username)
 
     topoplot_urls = {
-        s.upper(): f"{BASE_URL}/static/topoplots/{username}_topoplot_{s}.png"
+        s.upper(): f"{settings.BASE_URL}/static/topoplots/{username}_topoplot_{s}.png"
         for s in ['kraepelin_test', 'wcst', 'digit_span','openess', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']
     }
 
@@ -351,26 +352,29 @@ def run_full_analysis(path: str, user_id: int, username: str):
 # ======================
 # 5. SAVE KE DATABASE BARU (SESUAI ERD BARU)
 # ======================
-from config import BASE_URL, DB_CONFIG
+from config import settings
 
 def save_to_mysql(results, user_id):
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor()
+    db = mysql.connector.connect(
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        database=settings.DB_NAME
+    )
+    cursor = db.cursor() # <-- PERBAIKAN
 
     cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
     user_row = cursor.fetchone()
     if not user_row:
-        conn.close()
+        db.close() # <-- PERBAIKAN
         return {"error": f"User with id {user_id} not found"}
     username = user_row[0].lower().replace(" ", "_")
 
     # ======= PERSONALITY ID FIXED =======
     personality_ids = {
-        'OPENESS': 1,
-        'CONSCIENTIOUSNESS': 2,
-        'EXTRAVERSION': 3,
-        'AGREEABLENESS': 4,
-        'NEUROTICISM': 5
+        'OPENESS': 1, 'CONSCIENTIOUSNESS': 2, 'EXTRAVERSION': 3,
+        'AGREEABLENESS': 4, 'NEUROTICISM': 5
     }
 
     for row in results['big_five']:
@@ -398,9 +402,7 @@ def save_to_mysql(results, user_id):
 
     # ======= TEST ID FIXED =======
     test_ids = {
-        'KRAEPELIN TEST': 1,
-        'WCST': 2,
-        'DIGIT SPAN': 3
+        'KRAEPELIN TEST': 1, 'WCST': 2, 'DIGIT SPAN': 3
     }
 
     for row in results['cognitive_function']:
@@ -428,17 +430,9 @@ def save_to_mysql(results, user_id):
 
     # ======= STIMULATION ID FIXED =======
     stimulation_ids = {
-        'OPEN EYES': 1,
-        'CLOSED EYES': 2,
-        'AUTOBIOGRAPHY': 3,
-        'OPENESS': 4,  
-        'CONSCIENTIOUSNESS': 5,
-        'EXTRAVERSION': 6,
-        'AGREEABLENESS': 7,
-        'NEUROTICISM': 8,
-        'KRAEPELIN TEST': 9,
-        'WCST': 10,
-        'DIGIT SPAN': 11
+        'OPEN EYES': 1, 'CLOSED EYES': 2, 'AUTOBIOGRAPHY': 3, 'OPENESS': 4,
+        'CONSCIENTIOUSNESS': 5, 'EXTRAVERSION': 6, 'AGREEABLENESS': 7,
+        'NEUROTICISM': 8, 'KRAEPELIN TEST': 9, 'WCST': 10, 'DIGIT SPAN': 11
     }
 
     for row in results['response_during_test']:
@@ -453,6 +447,6 @@ def save_to_mysql(results, user_id):
             f"{username}_lineplot_{row['CATEGORY'].lower().replace(' ', '_')}.png"
         ))
 
-    conn.commit()
+    db.commit()
     cursor.close()
-    conn.close()
+    db.close()
