@@ -1,9 +1,34 @@
+# file: schemas.py
+
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, TypeVar, Generic # <-- 1. Tambahkan TypeVar dan Generic
 import datetime
 
 # ==================================
-# SKEMA UNTUK DATA RELASI (NESTED)
+# SKEMA STANDAR UNTUK SEMUA RESPONS (BARU)
+# ==================================
+
+# Tipe generik untuk payload
+PayloadType = TypeVar('PayloadType')
+
+class StandardResponse(BaseModel, Generic[PayloadType]):
+    """
+    Skema respons standar yang akan digunakan di semua endpoint.
+    """
+    message: str
+    payload: Optional[PayloadType] = None
+
+
+class TokenPayload(BaseModel):
+    """
+    Skema khusus untuk payload data token saat login.
+    """
+    access_token: str
+    token_type: str
+
+
+# ==================================
+# SKEMA UNTUK DATA RELASI (NESTED) - (TIDAK ADA PERUBAHAN)
 # ==================================
 
 class UserPersonality(BaseModel):
@@ -74,7 +99,7 @@ class Privilege(BaseModel):
         from_attributes = True
 
 # ==================================
-# SKEMA UTAMA USER (DENGAN RELASI)
+# SKEMA UTAMA USER (DENGAN RELASI) - (TIDAK ADA PERUBAHAN)
 # ==================================
 
 class User(BaseModel):
@@ -93,7 +118,6 @@ class User(BaseModel):
     jobs: Optional[str] = None
     note_jobs: Optional[str] = None
 
-    # Menambahkan list dari skema relasi di atas
     personalities_data: List[UserPersonality] = []
     personality_accuracies: List[UserPersonalityAccuracy] = []
     cognitive_data: List[UserCognitive] = []
@@ -106,11 +130,15 @@ class User(BaseModel):
     class Config:
         from_attributes = True
 
-class Token(BaseModel):
-    message: str
-    access_token: str
-    token_type: str
+# Skema Token yang lama sudah tidak diperlukan untuk response, digantikan oleh TokenPayload & StandardResponse
+# class Token(BaseModel):
+#     message: str
+#     access_token: str
+#     token_type: str
 
+# ==================================
+# SKEMA UNTUK HASIL ANALISIS (TIDAK ADA PERUBAHAN)
+# ==================================
 class AnalysisBigFive(BaseModel):
     PERSONALITY: str
     ENGAGEMENT: float
@@ -147,7 +175,6 @@ class AnalysisResponse(BaseModel):
     RELAX: float
     FOCUS: float
 
-# DITAMBAH: Skema utama yang menggabungkan semua hasil
 class AnalysisResult(BaseModel):
     big_five: List[AnalysisBigFive]
     cognitive_function: List[AnalysisCognitive]
@@ -156,4 +183,3 @@ class AnalysisResult(BaseModel):
     response_during_test: List[AnalysisResponse]
     topoplot_urls: dict[str, str]
     lineplot_urls: dict[str, str]
-

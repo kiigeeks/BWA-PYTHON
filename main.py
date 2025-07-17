@@ -1,3 +1,5 @@
+# file: main.py
+
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -12,8 +14,11 @@ from auth import get_current_user
 from logic import run_full_analysis
 from database import get_db
 import models
-import schemas
+import schemas # <-- Impor semua schemas
 from auth import create_access_token, get_password_hash, verify_password, get_user
+
+# <-- 1. Impor skema respons yang baru
+from schemas import StandardResponse, TokenPayload, AnalysisResult, User as UserSchema
 
 app = FastAPI()
 
@@ -31,12 +36,10 @@ app.add_middleware(
 # ==================================
 
 @app.post(
-    "/v1/users/login",
+    "/v1/bwa/users/login",
     summary="User Login",
-    response_model=schemas.Token  # <-- PERTAHANKAN BARIS INI
+    response_model=StandardResponse[TokenPayload]
 )
-
-@app.post("/v1/users/login", summary="User Login")
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db)
@@ -44,10 +47,8 @@ async def login_for_access_token(
     """
     Login user dengan username dan password, mengembalikan token JWT.
     """
-    # 1. Cari user di database
     user = get_user(db, form_data.username)
     
-    # 2. Jika user tidak ada atau password salah, kirim error
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,32 +56,25 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
         
-    # 3. Jika berhasil, buat token JWT
     access_token = create_access_token(
-        data={"sub": user.username, "user_id": user.id} # Menyimpan username dan id di token
+        data={"sub": user.username, "user_id": user.id}
     )
     
-    # 4. Kirim respons sukses
-    # Di dalam main.py, fungsi login_for_access_token
-
-    return {
-        "message": "Login berhasil",
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+    # <-- 3. Ubah format return sesuai skema baru
+    return StandardResponse(
+        message="Login berhasil",
+        payload=TokenPayload(access_token=access_token, token_type="bearer")
+    )
 
 # ==================================
 # ENDPOINT ANALISIS (REGISTRASI USER)
 # ==================================
 
-# endpoint analisis
 @app.post(
-    "/analyze/", 
+    "/v1/bwa/analyze/",
     summary="Register User and Analyze Data",
-    response_model=schemas.AnalysisResult
+    response_model=StandardResponse[AnalysisResult]
 )
-
-@app.post("/analyze/", summary="Register User and Analyze Data")
 async def analyze_csv(
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
@@ -97,19 +91,16 @@ async def analyze_csv(
     """
     Mendaftarkan user baru, menyimpan password yang sudah di-hash, dan menjalankan analisis.
     """
-    # Cek jika username sudah ada
     db_user = get_user(db, username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    # 1. HASH PASSWORD sebelum disimpan
     hashed_password = get_password_hash(password)
 
-    # 2. Buat objek user baru
     new_user = models.User(
         fullname=fullname,
         username=username,
-        password=hashed_password,  # Simpan password yang sudah di-hash
+        password=hashed_password,
         company=company,
         gender=gender,
         age=age,
@@ -122,24 +113,24 @@ async def analyze_csv(
     db.refresh(new_user)
     user_id = new_user.id
 
-    # 3. Simpan file sementara untuk analisis
     file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
     try:
-        # 4. Jalankan analisis utama
         result = run_full_analysis(file_path, user_id, username)
-        return result
+        # <-- 5. Ubah format return sesuai skema baru
+        return StandardResponse(
+            message="Analisis berhasil dan data user telah disimpan.",
+            payload=result
+        )
 
     except Exception as e:
-        # Jika analisis gagal, hapus user yang baru dibuat
         db.delete(new_user)
         db.commit()
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
     finally:
-        # 5. Hapus file sementara
         if os.path.exists(file_path):
             os.remove(file_path)
         for temp_file in ["cleaning.csv", "cleaning2.csv"]:
@@ -151,18 +142,16 @@ async def analyze_csv(
 # ==================================
 
 @app.get(
-    "/users/{user_id}", 
-    response_model=schemas.User,
+    "/v1/bwa/users/{user_id}",
+    # <-- 6. Ubah response_model ke format standar baru
+    response_model=StandardResponse[UserSchema],
     summary="Get User by ID with All Relations"
-    # Parameter 'responses' sudah dihapus
 )
-
-@app.get("/users/{user_id}", response_model=schemas.User, summary="Get User by ID with All Relations")
 async def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Mengambil data seorang pengguna berdasarkan ID beserta semua data relasinya.
     """
-    # Menggunakan options(joinedload(...)) untuk mengambil semua relasi dalam satu query
+
     db_user = db.query(models.User).options(
         joinedload(models.User.personalities_data),
         joinedload(models.User.personality_accuracies),
@@ -175,6 +164,11 @@ async def read_user(user_id: int, db: Session = Depends(get_db), current_user: m
     ).filter(models.User.id == user_id).first()
     
     if db_user is None:
+        # Untuk error, FastAPI akan otomatis mengirim format standar { "detail": "User not found" }
         raise HTTPException(status_code=404, detail="User not found")
         
-    return db_user
+    # <-- 7. Ubah format return sesuai skema baru
+    return StandardResponse(
+        message=f"Data user dengan ID {user_id} berhasil ditemukan.",
+        payload=db_user
+    )
