@@ -1,7 +1,7 @@
 # file: schemas.py
 
-from pydantic import BaseModel
-from typing import Optional, List, TypeVar, Generic # <-- 1. Tambahkan TypeVar dan Generic
+from pydantic import BaseModel, Field
+from typing import Optional, List, TypeVar, Generic
 import datetime
 
 # ==================================
@@ -183,3 +183,9 @@ class AnalysisResult(BaseModel):
     response_during_test: List[AnalysisResponse]
     topoplot_urls: dict[str, str]
     lineplot_urls: dict[str, str]
+
+class FilePathPayload(BaseModel):
+    """
+    Skema untuk payload yang berisi path file yang dihasilkan.
+    """
+    file_path: str = Field(..., description="Path ke file CSV yang dihasilkan")
