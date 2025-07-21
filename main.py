@@ -8,6 +8,7 @@ import uuid
 import os
 import shutil
 
+from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
 from logic import run_full_analysis
 from database import get_db, engine
@@ -56,30 +57,55 @@ async def login_for_access_token(
     access_token = create_access_token(data={"sub": user.username, "user_id": user.id})
     return StandardResponse(message="Login berhasil", payload=TokenPayload(access_token=access_token, token_type="bearer"))
 
-@app.post("/v1/bwa/analyze/", summary="Admin: Register Client and Analyze Data", response_model=StandardResponse[AnalysisResult], tags=["Analysis"])
-async def analyze_csv(db: Session = Depends(get_db), current_admin: models.User = Depends(get_current_user), file: UploadFile = File(...), fullname: str = Form(...), username: str = Form(...), password: str = Form(...), company: str = Form(...), gender: str = Form(...), age: int = Form(...), address: str = Form(...), test_date: str = Form(...), test_location: str = Form(...)):
+@app.post("/v1/bwa/analyze/", summary="Admin: Register Client and Analyze Data from EDF", response_model=StandardResponse[AnalysisResult], tags=["Analysis"])
+async def analyze_edf(db: Session = Depends(get_db), current_admin: models.User = Depends(get_current_user), file: UploadFile = File(...), fullname: str = Form(...), username: str = Form(...), password: str = Form(...), company: str = Form(...), gender: str = Form(...), age: int = Form(...), address: str = Form(...), test_date: str = Form(...), test_location: str = Form(...)):
+    # --- VALIDASI INPUT ---
     db_user = get_user(db, username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username for new client already registered")
+    if not file.filename.lower().endswith('.edf'):
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an .edf file.")
+
+    # --- REGISTRASI USER ---
     hashed_password = get_password_hash(password)
     new_user = models.User(fullname=fullname, username=username, password=hashed_password, company=company, gender=gender, age=age, address=address, test_date=test_date, test_location=test_location)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     user_id = new_user.id
-    file_path = f"./{uuid.uuid4()}_{file.filename}"
-    with open(file_path, "wb") as f:
+    
+    # --- PERSIAPAN FILE PATHS ---
+    unique_id = uuid.uuid4()
+    temp_edf_path = f"./{unique_id}_{file.filename}"
+    processed_csv_path = f"./{unique_id}_processed.csv"
+    
+    # Simpan file EDF yang diunggah
+    with open(temp_edf_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
+        
     try:
-        result = run_full_analysis(file_path, user_id, username)
-        return StandardResponse(message="Analisis berhasil dan data client baru telah disimpan.", payload=result)
+        # --- (LANGKAH BARU) PROSES EDF KE CSV DENGAN ICA, POW, PM ---
+        print("Starting EDF to CSV processing...")
+        process_edf_to_final_csv(temp_edf_path, processed_csv_path)
+        
+        # --- (LANGKAH LAMA) JALANKAN ANALISIS UTAMA MENGGUNAKAN CSV YANG BARU DIBUAT ---
+        print("Starting full analysis on processed CSV...")
+        result = run_full_analysis(processed_csv_path, user_id, username)
+        
+        return StandardResponse(message="Analisis dari file EDF berhasil dan data client baru telah disimpan.", payload=result)
+        
     except Exception as e:
         db.delete(new_user)
         db.commit()
+        # Berikan pesan error yang lebih spesifik
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        
     finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        # --- CLEANUP / HAPUS SEMUA FILE SEMENTARA ---
+        if os.path.exists(temp_edf_path):
+            os.remove(temp_edf_path)
+        if os.path.exists(processed_csv_path):
+            os.remove(processed_csv_path)
         for temp_file in ["cleaning.csv", "cleaning2.csv"]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
