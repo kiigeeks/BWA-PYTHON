@@ -205,14 +205,14 @@ def analyze_response_during_test(csv_path="cleaning.csv"):
 def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/topoplots", username="default"):
     os.makedirs(output_dir, exist_ok=True)
     df = pd.read_csv(cleaning2_path)
-    
+
     ch_names = ['AF3', 'T7', 'Pz', 'T8', 'AF4']
     info = mne.create_info(ch_names=ch_names, sfreq=256, ch_types='eeg')
     montage = mne.channels.make_standard_montage('standard_1020')
     info.set_montage(montage)
 
     sessions_to_plot = {k: v for k, v in SESSION_DEFINITIONS.items() if k not in ['OPEN EYES', 'CLOSED EYES', 'AUTOBIOGRAPHY']}
-    
+
     bands_map = {
         'Theta': [col for col in df.columns if 'Theta' in col],
         'Alpha': [col for col in df.columns if 'Alpha' in col],
@@ -227,34 +227,34 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
             continue
 
         fig, axes = plt.subplots(1, 5, figsize=(25, 6))
-        
+
         for i, (band_name, band_cols) in enumerate(bands_map.items()):
             ax = axes[i]
             avg_values = session_df[band_cols].mean().values
-            
-            # --- PERUBAHAN UTAMA DAN FINAL DI SINI ---
 
-            # Langkah 1: Hitung vmin dan vmax LOKAL khusus untuk band ini
-            # Tambahkan sedikit epsilon untuk mencegah error jika semua nilai sama
             vmin = np.min(avg_values)
             vmax = np.max(avg_values)
             if vmin == vmax:
-                vmin -= 1e-9 # Mencegah error jika semua nilai sama persis
+                vmin -= 1e-9
                 vmax += 1e-9
 
-            # Panggil plot_topomap seperti biasa
-            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, cmap='jet')
+            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, cmap='jet', names=ch_names)
             
-            # Langkah 2: PAKSAKAN skala warna lokal ke gambar
+            # Mengatur font nama channel di topografi
+            for text in ax.texts:
+                if text.get_text() in ch_names:
+                    text.set_fontweight('bold')
+                    text.set_fontsize(16)
+
             im.set_clim(vmin, vmax)
             
-            # Langkah 3: Buat colorbar. Skalanya akan otomatis mengikuti vmin/vmax yang baru
             cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.8)
-            cbar.set_label('Power (dB)', fontsize=10)
             
-            ax.set_title(band_name, fontsize=12)
-        
-        fig.suptitle(f'Topoplot Aktivitas Otak: {session_name}', fontsize=16, y=0.98)
+            cbar.ax.tick_params(labelsize=12)
+            
+            ax.set_title(band_name, fontsize=12, fontweight='bold')
+
+        fig.suptitle(f'Topoplot Aktivitas Otak: {session_name}', fontsize=16, y=0.98, fontweight='bold')
         plt.tight_layout(rect=[0, 0.05, 1, 0.95])
 
         filename = f"{username}_topoplot_{session_name.lower().replace(' ', '_')}.png"
