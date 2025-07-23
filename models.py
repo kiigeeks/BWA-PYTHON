@@ -1,4 +1,4 @@
-# models.py
+# models.py (Versi Terbaru)
 
 # Import komponen yang dibutuhkan dari sqlalchemy
 from sqlalchemy import (
@@ -83,7 +83,7 @@ class Stimulation(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
-    title_graph = Column(String(255), nullable=True)
+    # --- KOLOM title_graph DIHAPUS ---
 
     user_response_data = relationship("UserResponse", back_populates="stimulation")
 
@@ -107,9 +107,6 @@ class UserPersonality(Base):
     
     user = relationship("User", back_populates="personalities_data")
     personality = relationship("Personality", back_populates="user_personalities")
-
-# ... (Kelas UserPersonalityAccuracy, UserCognitive, UserSplitBrain, UserResponse, FitJob, Develop, Privilege tetap sama persis seperti sebelumnya) ...
-# (Saya singkat di sini agar tidak terlalu panjang, cukup salin dari kode sebelumnya)
 
 class UserPersonalityAccuracy(Base):
     __tablename__ = "user_personality_accuracies"
@@ -157,7 +154,7 @@ class UserResponse(Base):
     stress = Column(Float)
     relax = Column(Float)
     focus = Column(Float)
-    graph = Column(String(255))
+    # --- KOLOM graph DIHAPUS ---
     user = relationship("User", back_populates="response_data")
     stimulation = relationship("Stimulation", back_populates="user_response_data")
 

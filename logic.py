@@ -1,4 +1,4 @@
-# logic.py (Versi Refactor dengan Segmentasi Waktu)
+# logic.py (Versi Refactor dengan Segmentasi Waktu - Tanpa Line Plot)
 import mne
 import pandas as pd
 import numpy as np
@@ -262,49 +262,7 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
         plt.savefig(output_file, dpi=150)
         plt.close(fig)
 
-def generate_line_plot_all_sessions(cleaning2_path="cleaning2.csv", output_dir="static/lineplots", username="default"):
-    # (Logika ini juga di-refactor agar lebih sederhana dan berbasis waktu)
-    os.makedirs(output_dir, exist_ok=True)
-    df = pd.read_csv(cleaning2_path)
-    
-    electrodes = ['AF3', 'T7', 'Pz', 'T8', 'AF4']
-    freq_bands = ['Theta', 'Alpha', 'Beta', 'BetaH', 'Gamma']
-    
-    lineplot_urls = {}
-
-    for session_name, (start_time, end_time) in SESSION_DEFINITIONS.items():
-        session_df = df[(df['time'] >= start_time) & (df['time'] < end_time)]
-        if session_df.empty:
-            continue
-            
-        plt.figure(figsize=(12, 8))
-        
-        # Data untuk plot
-        plot_data = {}
-        for el in electrodes:
-            el_cols = {band: f"POW.{el}.{band}" for band in freq_bands}
-            plot_data[el] = [session_df[col].mean() for col in el_cols.values()]
-
-        # Plotting
-        for el in electrodes:
-            plt.plot(freq_bands, plot_data[el], 'o-', label=el)
-
-        plt.xlabel('Frequency Bands', fontsize=12)
-        plt.ylabel('Average Power (μV²)', fontsize=12)
-        plt.title(f'Aktivitas Rata-rata per Elektroda: {session_name}', fontsize=14, fontweight='bold')
-        plt.legend(title='Electrode', loc='upper right')
-        plt.grid(True, linestyle='--', alpha=0.6)
-        plt.tight_layout()
-
-        safe_session = session_name.lower().replace(" ", "_")
-        filename = f"{username}_lineplot_{safe_session}.png"
-        output_file = os.path.join(output_dir, filename)
-        plt.savefig(output_file, dpi=150)
-        plt.close()
-
-        lineplot_urls[session_name] = f"{settings.BASE_URL}/{output_file}"
-
-    return lineplot_urls
+# --- FUNGSI generate_line_plot_all_sessions DIHAPUS DARI SINI ---
 
 # ======================
 # 4. RUN ANALYSIS UTAMA
@@ -321,8 +279,8 @@ def run_full_analysis(path: str, user_id: int, username: str):
     response = analyze_response_during_test("cleaning.csv")
 
     generate_all_topoplots("cleaning2.csv", username=username)
-    lineplot_urls = generate_line_plot_all_sessions("cleaning2.csv", username=username)
-
+    
+    # --- PANGGILAN DAN PENGGUNAAN lineplot_urls DIHAPUS ---
     topoplot_sessions = ['KRAEPELIN_TEST', 'WCST', 'DIGIT_SPAN', 'OPENESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM']
     topoplot_urls = {
         s.upper(): f"{settings.BASE_URL}/static/topoplots/{username}_topoplot_{s.lower()}.png"
@@ -336,7 +294,7 @@ def run_full_analysis(path: str, user_id: int, username: str):
         "personality_accuracy": accuracy,
         "response_during_test": response,
         "topoplot_urls": topoplot_urls,
-        "lineplot_urls": lineplot_urls
+        # --- KEY 'lineplot_urls' DIHAPUS DARI HASIL AKHIR ---
     }
 
     save_to_mysql(result, user_id, username)
@@ -411,9 +369,10 @@ def save_to_mysql(results, user_id, username): # PERBAIKAN: Terima 'username' di
     for row in results['response_during_test']:
         stimulation_id = stimulation_ids.get(row['CATEGORY'].upper())
         if not stimulation_id: continue
+        # --- PERUBAHAN: Menghapus kolom 'graph' dari query INSERT ---
         cursor.execute(
-            "INSERT INTO user_response (user_id, stimulation_id, attention, stress, relax, focus, graph) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (user_id, stimulation_id, clean_nan(row['ATTENTION']), clean_nan(row['STRESS']), clean_nan(row['RELAX']), clean_nan(row['FOCUS']), f"{settings.BASE_URL}/static/lineplots/{username}_lineplot_{row['CATEGORY'].lower().replace(' ', '_')}.png")
+            "INSERT INTO user_response (user_id, stimulation_id, attention, stress, relax, focus) VALUES (%s, %s, %s, %s, %s, %s)",
+            (user_id, stimulation_id, clean_nan(row['ATTENTION']), clean_nan(row['STRESS']), clean_nan(row['RELAX']), clean_nan(row['FOCUS']))
         )
 
     db.commit()
