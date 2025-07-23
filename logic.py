@@ -230,20 +230,20 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
 
         for i, (band_name, band_cols) in enumerate(bands_map.items()):
             ax = axes[i]
-            # Ambil rata-rata dalam dB
-            avg_values_db = session_df[band_cols].mean().values
+            # Ambil rata-rata, nilainya sudah dalam microvolt^2
+            avg_values = session_df[band_cols].mean().values
             
-            # --- PERUBAHAN 1: Konversi dari dB ke microvolt^2 ---
-            avg_values_microvolt = 10**(avg_values_db / 10)
+            # Baris konversi dari dB sudah tidak diperlukan lagi
+            # avg_values_microvolt = 10**(avg_values_db / 10) <-- DIHAPUS
 
-            # --- PERUBAHAN 2: Gunakan nilai microvolt untuk plot ---
-            vmin = np.min(avg_values_microvolt)
-            vmax = np.max(avg_values_microvolt)
+            # Langsung gunakan nilai rata-rata untuk plot
+            vmin = np.min(avg_values)
+            vmax = np.max(avg_values)
             if vmin == vmax:
-                vmin -= 1e-9 # Tambahkan epsilon kecil untuk menghindari error jika semua nilai sama
+                vmin -= 1e-9 
                 vmax += 1e-9
 
-            im, _ = mne.viz.plot_topomap(avg_values_microvolt, info, axes=ax, show=False, cmap='jet', names=ch_names)
+            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, cmap='jet', names=ch_names)
             
             # Mengatur font nama channel di topografi
             for text in ax.texts:

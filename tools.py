@@ -304,7 +304,8 @@ def eeg_fast_transform(t, eeg_data, epoch_len, epoch_step, channels,
     trans = None
     for band in band_indices:
         band_power = np.sum(eeg_fft_square_3d[band, :, :], axis=0)
-        band_power = 10*np.log10(band_power/(len(band)))
+        # Menghitung rata-rata power absolut, tanpa konversi ke log10 (decibel)
+        band_power = band_power / len(band) # <-- DIUBAH MENJADI INI
         trans = band_power.T if trans is None else \
             np.concatenate((trans, band_power.T), axis=1)
             
