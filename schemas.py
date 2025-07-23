@@ -98,6 +98,13 @@ class Privilege(BaseModel):
     class Config:
         from_attributes = True
 
+class ROCCurve(BaseModel):
+    graph: str
+    note: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 # ==================================
 # SKEMA UTAMA USER (DENGAN RELASI)
 # ==================================
@@ -126,6 +133,7 @@ class User(BaseModel):
     fit_jobs: List[FitJob] = []
     develops: List[Develop] = []
     privileges: List[Privilege] = []
+    roc_curves: List[ROCCurve] = []
 
     class Config:
         from_attributes = True
@@ -176,7 +184,7 @@ class AnalysisResult(BaseModel):
     personality_accuracy: List[AnalysisPersonalityAccuracy]
     response_during_test: List[AnalysisResponse]
     topoplot_urls: dict[str, str]
-    # --- FIELD lineplot_urls DIHAPUS ---
+    roc_curve_urls: dict[str, str]
 
 class FilePathPayload(BaseModel):
     """

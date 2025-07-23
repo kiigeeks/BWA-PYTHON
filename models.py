@@ -47,6 +47,7 @@ class User(Base):
     fit_jobs = relationship("FitJob", back_populates="user", cascade="all, delete-orphan")
     develops = relationship("Develop", back_populates="user", cascade="all, delete-orphan")
     privileges = relationship("Privilege", back_populates="user", cascade="all, delete-orphan")
+    roc_curves = relationship("ROCCurve", back_populates="user", cascade="all, delete-orphan")
 
 # ==============================================================================
 #  2. TABEL LOOKUP (MASTER DATA)
@@ -180,6 +181,16 @@ class Privilege(Base):
     reason = Column(Text)
     user = relationship("User", back_populates="privileges")
 
+class ROCCurve(Base):
+    """Menyimpan path dan informasi untuk grafik ROC yang dihasilkan."""
+    __tablename__ = "roc_curves"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    graph = Column(String(255), nullable=False)
+    note = Column(Text, nullable=True)
+
+    user = relationship("User", back_populates="roc_curves")
 
 # --- Fungsi untuk membuat semua tabel di database ---
 def create_all_tables():

@@ -230,15 +230,20 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
 
         for i, (band_name, band_cols) in enumerate(bands_map.items()):
             ax = axes[i]
-            avg_values = session_df[band_cols].mean().values
+            # Ambil rata-rata dalam dB
+            avg_values_db = session_df[band_cols].mean().values
+            
+            # --- PERUBAHAN 1: Konversi dari dB ke microvolt^2 ---
+            avg_values_microvolt = 10**(avg_values_db / 10)
 
-            vmin = np.min(avg_values)
-            vmax = np.max(avg_values)
+            # --- PERUBAHAN 2: Gunakan nilai microvolt untuk plot ---
+            vmin = np.min(avg_values_microvolt)
+            vmax = np.max(avg_values_microvolt)
             if vmin == vmax:
-                vmin -= 1e-9
+                vmin -= 1e-9 # Tambahkan epsilon kecil untuk menghindari error jika semua nilai sama
                 vmax += 1e-9
 
-            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, cmap='jet', names=ch_names)
+            im, _ = mne.viz.plot_topomap(avg_values_microvolt, info, axes=ax, show=False, cmap='jet', names=ch_names)
             
             # Mengatur font nama channel di topografi
             for text in ax.texts:
@@ -250,6 +255,8 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
             
             cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.8)
             
+            # --- PERUBAHAN 3: Set label colorbar ke unit yang baru ---
+            cbar.set_label('Power ($\mu V^2$)', fontsize=14, fontweight='bold')
             cbar.ax.tick_params(labelsize=12)
             
             ax.set_title(band_name, fontsize=12, fontweight='bold')
@@ -262,7 +269,95 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
         plt.savefig(output_file, dpi=150)
         plt.close(fig)
 
-# --- FUNGSI generate_line_plot_all_sessions DIHAPUS DARI SINI ---
+def generate_roc_curves(cleaning2_path="cleaning2.csv", output_dir="static/roc_curves", username="default"):
+    """
+    Menghasilkan grafik ROC dengan sambungan garis yang dibulatkan agar
+    terlihat lebih mulus secara visual.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    df = pd.read_csv(cleaning2_path)
+    
+    channels = ['AF3', 'T7', 'Pz', 'T8', 'AF4']
+    bands_map = {
+        'Theta': 'Theta',
+        'Alpha': 'Alpha',
+        'Beta': 'Beta',
+        'Gamma': 'Gamma'
+    }
+
+    baseline_start, baseline_end = SESSION_DEFINITIONS['AUTOBIOGRAPHY']
+    df_baseline = df[(df['time'] >= baseline_start) & (df['time'] < baseline_end)]
+
+    task_sessions_names = ['OPENESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM', 'KRAEPELIN TEST', 'WCST', 'DIGIT SPAN']
+    
+    roc_results = []
+
+    for channel in channels:
+        for band_key, band_name in bands_map.items():
+            col_name = f"POW.{channel}.{band_name}"
+            if col_name not in df.columns:
+                continue
+
+            plt.figure(figsize=(10, 8))
+            
+            for session_name in task_sessions_names:
+                task_start, task_end = SESSION_DEFINITIONS[session_name]
+                df_task_single = df[(df['time'] >= task_start) & (df['time'] < task_end)]
+
+                baseline_scores = df_baseline[col_name].dropna().values
+                task_scores = df_task_single[col_name].dropna().values
+                
+                if len(baseline_scores) == 0 or len(task_scores) == 0:
+                    continue
+
+                y_scores = np.concatenate([baseline_scores, task_scores])
+                y_true = np.concatenate([np.zeros(len(baseline_scores)), np.ones(len(task_scores))])
+
+                min_score, max_score = np.min(y_scores), np.max(y_scores)
+                # Kita tetap gunakan banyak threshold agar resolusi tetap tinggi
+                thresholds = np.linspace(min_score, max_score, 200)
+
+                tpr_list, fpr_list = [], []
+
+                for thresh in sorted(thresholds, reverse=True):
+                    y_pred = (y_scores >= thresh).astype(int)
+                    tp = np.sum((y_true == 1) & (y_pred == 1))
+                    fp = np.sum((y_true == 0) & (y_pred == 1))
+                    tn = np.sum((y_true == 0) & (y_pred == 0))
+                    fn = np.sum((y_true == 1) & (y_pred == 0))
+                    
+                    tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+                    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+                    tpr_list.append(tpr)
+                    fpr_list.append(fpr)
+                
+                auc = np.trapz(tpr_list, fpr_list)
+
+                # --- PERUBAHAN VISUAL DI SINI ---
+                # Tambahkan solid_joinstyle='round' untuk membulatkan sudut
+                plt.plot(fpr_list, tpr_list, lw=2.5, label=f'{session_name} (AUC = {auc:.2f})', solid_joinstyle='round')
+
+            # Finalisasi plot
+            plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.05])
+            plt.xlabel('False Positive Rate', fontsize=12)
+            plt.ylabel('True Positive Rate', fontsize=12)
+            plt.title(f'ROC: {band_key} on {channel} (Baseline vs Tasks)', fontsize=14, fontweight='bold')
+            plt.legend(loc="lower right", fontsize='small')
+            plt.grid(alpha=0.4)
+            
+            # Simpan file
+            filename = f"{username}_roc_{channel}_{band_key.lower()}.png"
+            output_file = os.path.join(output_dir, filename)
+            plt.savefig(output_file, dpi=120)
+            plt.close()
+            
+            # Kumpulkan hasil
+            note = f"ROC Curves for {band_key} on {channel}, comparing Baseline (Autobiography) vs 8 individual Task Sessions."
+            roc_results.append({"graph": output_file, "note": note})
+            
+    return roc_results
 
 # ======================
 # 4. RUN ANALYSIS UTAMA
@@ -279,12 +374,17 @@ def run_full_analysis(path: str, user_id: int, username: str):
     response = analyze_response_during_test("cleaning.csv")
 
     generate_all_topoplots("cleaning2.csv", username=username)
+    roc_results = generate_roc_curves("cleaning2.csv", username=username)
     
     # --- PANGGILAN DAN PENGGUNAAN lineplot_urls DIHAPUS ---
     topoplot_sessions = ['KRAEPELIN_TEST', 'WCST', 'DIGIT_SPAN', 'OPENESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM']
     topoplot_urls = {
         s.upper(): f"{settings.BASE_URL}/static/topoplots/{username}_topoplot_{s.lower()}.png"
         for s in topoplot_sessions
+    }
+    roc_curve_urls = {
+        os.path.basename(res['graph']).replace('.png', ''): f"{settings.BASE_URL}/{res['graph']}"
+        for res in roc_results
     }
     
     result = {
@@ -294,10 +394,11 @@ def run_full_analysis(path: str, user_id: int, username: str):
         "personality_accuracy": accuracy,
         "response_during_test": response,
         "topoplot_urls": topoplot_urls,
-        # --- KEY 'lineplot_urls' DIHAPUS DARI HASIL AKHIR ---
+        "roc_curve_urls": roc_curve_urls, # Tambahkan ke hasil
+        "roc_results_db": roc_results # Data mentah untuk disimpan ke DB
     }
-
     save_to_mysql(result, user_id, username)
+    del result["roc_results_db"]
     return result
 
 # ======================
@@ -374,6 +475,15 @@ def save_to_mysql(results, user_id, username): # PERBAIKAN: Terima 'username' di
             "INSERT INTO user_response (user_id, stimulation_id, attention, stress, relax, focus) VALUES (%s, %s, %s, %s, %s, %s)",
             (user_id, stimulation_id, clean_nan(row['ATTENTION']), clean_nan(row['STRESS']), clean_nan(row['RELAX']), clean_nan(row['FOCUS']))
         )
+
+    if 'roc_results_db' in results:
+        for row in results['roc_results_db']:
+            graph_path = row['graph'].replace('\\', '/')
+            note = row['note']
+            cursor.execute(
+                "INSERT INTO roc_curves (user_id, graph, note) VALUES (%s, %s, %s)",
+                (user_id, graph_path, note)
+            )
 
     db.commit()
     cursor.close()
