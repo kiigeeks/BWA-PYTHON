@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 import uuid
 import os
 import shutil
+import mimetypes
 
 from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
@@ -141,10 +142,7 @@ async def process_edf_with_ica_endpoint(file: UploadFile = File(...)):
     summary="Download a generated file", 
     tags=["Tools"],
     responses={
-        200: {
-            "content": {"text/csv": {}},
-            "description": "Returns the requested file for download.",
-        },
+        200: {"description": "Returns the requested file for download."},
         404: {"description": "File not found"},
     }
 )
@@ -154,10 +152,11 @@ async def download_file(filepath: str):
     if not os.path.exists(full_path) or not os.path.isfile(full_path):
         raise HTTPException(status_code=404, detail="File tidak ditemukan")
 
+    mime_type, _ = mimetypes.guess_type(filepath)
     return FileResponse(
-        path=full_path,
-        media_type="text/csv",
-        filename=os.path.basename(full_path) # os.path.basename di sini aman untuk mengambil nama file saja
+        path=filepath,
+        media_type=mime_type or "application/octet-stream",
+        filename=os.path.basename(filepath)
     )
 
 @app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["Users"])
