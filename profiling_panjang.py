@@ -374,93 +374,78 @@ def halaman_7(c, person_fit_job,page_num):
     draw_footer(c, page_num)
     c.showPage()
 
-def halaman_8(c, referensi_text_1,page_num):
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph
+from reportlab.lib.enums import TA_JUSTIFY
+import re
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
+
+def format_underline_links(text):
+    return re.sub(
+        r"(https?://[^\s\n]+)",
+        r"<u><font color='#3366cc'>\1</font></u>",
+        text
+    )
+
+def halaman_8(c, referensi_text_1, page_num):
+    y_position = PAGE_HEIGHT - 150  # awal di bawah judul
+    left_margin = 60
+    right_margin = 60
+    line_spacing = 5
+
+    # Style hanging indent + support link underline
+    style = ParagraphStyle(
+        name="JustifySmall",
+        fontName="Times-Roman",
+        fontSize=11.5,
+        leading=14,
+        alignment=TA_JUSTIFY,
+        leftIndent=20,
+        firstLineIndent=-20,
+        spaceAfter=8,
+        underlineWidth=0.4,
+        underlineOffset= -2.5    
+    )
+
+    # Format semua link dalam referensi jadi underline biru
+    referensi_text_1 = format_underline_links(referensi_text_1)
+
+    # Gambar header dan judul
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
-
-    # Judul
-    y_start = PAGE_HEIGHT - 170
     c.setFont("Times-Bold", 12)
-    c.drawString(60, y_start, "Referensi")
-    
-    style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=14,
-        alignment=TA_JUSTIFY,
-    )
-    # INPUT HASIL GENERATE AI DISINI
-    #
-    #
-    #
-    summary_para = Paragraph(referensi_text_1, style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
-    w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
-    #
-    #
-    #
-    y_text = y_start - 20  # padding bawah judul
-    summary_para.drawOn(c, 60, y_text - h)
-    
+    c.drawCentredString(PAGE_WIDTH / 2, y_position, "Referensi")
+    y_position -= 15  # Jarak dari judul ke teks
+
+    # Pecah berdasarkan double newline antar referensi
+    referensi_list = referensi_text_1.strip().split("\n\n")
+    max_width = PAGE_WIDTH - left_margin - right_margin
+
+    for ref in referensi_list:
+        ref_paragraph = Paragraph(ref.replace("\n", " "), style)
+        w, h = ref_paragraph.wrap(max_width, PAGE_HEIGHT)
+
+        # Jika tidak muat di halaman sekarang, pindah halaman
+        if y_position - h < 80:
+            draw_footer(c, page_num)
+            c.showPage()
+            page_num += 1
+
+            # --- RESET HEADER HALAMAN BARU ---
+            draw_watermark(c, "cia_watermark.png")
+            draw_header(c)
+            y_position = PAGE_HEIGHT - 140
+
+        # Gambar referensi
+        ref_paragraph.drawOn(c, left_margin, y_position - h)
+        y_position -= h + line_spacing
+
+    # Footer terakhir
     draw_footer(c, page_num)
     c.showPage()
 
-def halaman_9(c, referensi_text_2,page_num):
-    draw_watermark(c, "cia_watermark.png")
-    draw_header(c)
-    y_start = PAGE_HEIGHT - 170
-    style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=14,
-        alignment=TA_JUSTIFY,
-    )
-    # INPUT HASIL GENERATE AI DISINI
-    #
-    #
-    #
-    summary_para = Paragraph(referensi_text_2, style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
-    w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
-    #
-    #
-    #
-    y_text = y_start - 20  # padding bawah judul
-    summary_para.drawOn(c, 60, y_text - h)
-    
-    draw_footer(c, page_num)
-    c.showPage()
-
-def halaman_10(c, referensi_text_3,page_num):
-    draw_watermark(c, "cia_watermark.png")
-    draw_header(c)
-
-    # Judul
-    y_start = PAGE_HEIGHT - 170
-    
-    style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=14,
-        alignment=TA_JUSTIFY,
-    )
-    # INPUT HASIL GENERATE AI DISINI
-    #
-    #
-    #
-    summary_para = Paragraph(referensi_text_3, style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
-    w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
-    #
-    #
-    #
-    y_text = y_start - 20  # padding bawah judul
-    summary_para.drawOn(c, 60, y_text - h)
-    draw_footer(c, page_num)
-    c.showPage()
         
 def halaman_11(c, disclaimer_text, page_num):
     draw_watermark(c, "cia_watermark.png")
@@ -707,7 +692,7 @@ if __name__ == "__main__":
     )
 
     referensi_text_2 = (
-    "Jawinski, P., et al. (2021). The Big Five Personality Traits and Brain Arousal in the Resting State. "
+        "Jawinski, P., et al. (2021). The Big Five Personality Traits and Brain Arousal in the Resting State. "
     "Psychophysiology, 58(1), e13722. https://pubmed.ncbi.nlm.nih.gov/34679337/\n\n"
 
     "Jensen, O., & Tesche, C. D. (2002). Frontal theta activity in humans increases with memory load in a "
@@ -769,10 +754,8 @@ if __name__ == "__main__":
     "Roslan, N. S., Izhar, L. I., Faye, I., Amin, H. U., Mohamad Saad, M. N., Sivapalan, S., Abdul Karim, S. A., "
     "& Abdul Rahman, M. (2019). Neural correlates of eye contact in face-to-face verbal interaction: "
     "An EEG-based study of the extraversion personality trait. PLoS."
-    )
     
-    referensi_text_3 = (
-        "Sargent, J., et al. (2021). Frontal midline theta and gamma activity supports task control and "
+    "Sargent, J., et al. (2021). Frontal midline theta and gamma activity supports task control and "
     "conscientiousness. Neuroscience & Biobehavioral Reviews, 124, 69–77. "
     "https://www.sciencedirect.com/science/article/abs/pii/S0306453020305395\n\n"
 
@@ -826,6 +809,7 @@ if __name__ == "__main__":
     "Zhu, X., et al. (2020). EEG responses to emotional videos can quantitatively predict big-five personality traits. "
     "Frontiers in Human Neuroscience."
     )
+
     disclaimer_text = (
         'Profiling ini <b>bukan merupakan tes psikologi</b> melainkan '
         '<b>deskripsi profile respon elektrofisiologis sistem syaraf terhadap stimulus behavioral traits dan cognitive traits</b> '
@@ -859,8 +843,6 @@ if __name__ == "__main__":
     halaman_6(c, person_fit_job, page_num=6)
     halaman_7(c, person_fit_job, page_num=7)
     halaman_8(c, referensi_text_1, page_num=8)
-    halaman_9(c, referensi_text_2, page_num=9)
-    halaman_10(c, referensi_text_3, page_num=10)
-    halaman_11(c, disclaimer_text, page_num=11)
+    halaman_11(c, disclaimer_text, page_num=12)
     c.save()
     print("PDF 'laporan_panjang.pdf' berhasil dibuat!")
