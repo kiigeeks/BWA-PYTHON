@@ -313,7 +313,7 @@ def halaman_5(c, cognitive_traits_text_2,topoplot2,judul_topoplot2 ,page_num):
     draw_footer(c, page_num)
     c.showPage()
     
-def halaman_6(c, generate_ai,page_num):
+def halaman_6(c, person_fit_job,page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
@@ -333,7 +333,7 @@ def halaman_6(c, generate_ai,page_num):
     #
     #
     #
-    summary_para = Paragraph(generate_ai, style)
+    summary_para = Paragraph(person_fit_job, style)
     max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
     w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
     #
@@ -345,7 +345,7 @@ def halaman_6(c, generate_ai,page_num):
     draw_footer(c, page_num)
     c.showPage()
 
-def halaman_7(c, generate_ai,page_num):
+def halaman_7(c, person_fit_job,page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
     
@@ -362,7 +362,7 @@ def halaman_7(c, generate_ai,page_num):
     #
     #
     #
-    summary_para = Paragraph(generate_ai, style)
+    summary_para = Paragraph(person_fit_job, style)
     max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
     w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
     #
@@ -524,57 +524,39 @@ if __name__ == "__main__":
     }
 
     executive_summary_text = (
-        "Hasil EEG engagement dan interest menunjukan pada aktivasi tinggi pada stimulus "
-        "extraversion dan stimulus digit span atau short-term memory. Individu dengan kepribadian "
-        "ekstravert dan kemampuan berpikir jangka pendek (short-term thinking) “kurang sesuai” "
-        "untuk posisi Staff Data Analyst. Kepribadian ekstravert biasanya lebih nyaman dalam "
-        "lingkungan sosial yang dinamis dan interaktif, serta cenderung berfokus pada interaksi dengan "
-        "orang lain dan pencapaian hasil langsung. Sebaliknya, pekerjaan sebagai data analyst lebih "
-        "menuntut fokus pada analisis data yang mendalam, berpikir jangka panjang, serta kemampuan "
-        "untuk mengelola informasi dalam waktu yang lebih lama. Pekerjaan ini juga membutuhkan "
-        "ketelitian, kesabaran, dan pengambilan keputusan berbasis data yang tidak selalu dapat "
-        "diputuskan dalam waktu singkat. Kemampuan berpikir short-term juga berpotensi kurang "
-        "cocok untuk pekerjaan ini, yang lebih sering mengharuskan individu untuk berpikir secara "
-        "strategis dan panjang dalam mengelola dataset yang besar, memikirkan pola, dan melakukan "
-        "analisis yang bisa memakan waktu. Pekerjaan ini memerlukan fokus yang lebih pada akurasi "
-        "dan pengolahan data daripada pencapaian hasil cepat atau keputusan yang diambil dalam "
-        "waktu singkat. Posisi Staff Data Analyst akan lebih cocok untuk individu yang memiliki "
-        "kepribadian introvert (lebih tenang dan fokus pada detail) dan kemampuan untuk "
-        "berpikir jangka panjang, di mana mereka dapat beradaptasi dengan lingkungan kerja yang "
-        "lebih tenang dan dapat mengelola proyek-proyek yang memerlukan waktu lebih lama untuk "
-        "dianalisis dan diproses."
+        ""
     )
 
     behavior_traits_text = (
-    "Hasil analisis EEG menunjukkan bahwa individu dengan tingkat Extraversion yang tinggi "
-    "cenderung memiliki aktivitas otak yang khas. Penelitian oleh Tran et al. (2001) menemukan "
-    "bahwa individu ekstrovert menunjukkan amplitudo gelombang alfa (8–13 Hz) yang lebih tinggi "
-    "di area frontal korteks dibandingkan dengan individu introvert. Temuan ini menunjukkan "
-    "bahwa ekstrovert memiliki tingkat arousal kortikal yang lebih rendah, yang konsisten dengan "
-    "teori arousal oleh Eysenck (1967) yang menyatakan bahwa ekstrovert memiliki tingkat arousal "
-    "kortikal yang lebih rendah dan oleh karena itu mencari stimulasi eksternal untuk mencapai "
-    "tingkat arousal optimal."
-    
-    "<br/><br/>"
+        "Hasil analisis EEG menunjukkan bahwa individu dengan tingkat Extraversion yang tinggi "
+        "cenderung memiliki aktivitas otak yang khas. Penelitian oleh Tran et al. (2001) menemukan "
+        "bahwa individu ekstrovert menunjukkan amplitudo gelombang alfa (8–13 Hz) yang lebih tinggi "
+        "di area frontal korteks dibandingkan dengan individu introvert. Temuan ini menunjukkan "
+        "bahwa ekstrovert memiliki tingkat arousal kortikal yang lebih rendah, yang konsisten dengan "
+        "teori arousal oleh Eysenck (1967) yang menyatakan bahwa ekstrovert memiliki tingkat arousal "
+        "kortikal yang lebih rendah dan oleh karena itu mencari stimulasi eksternal untuk mencapai "
+        "tingkat arousal optimal."
+        
+        "<br/><br/>"
 
-    "Selain itu, studi oleh Roslan et al. (2019) menunjukkan bahwa selama interaksi tatap muka, "
-    "individu dengan tingkat Extraversion yang tinggi menunjukkan koherensi alfa yang lebih besar "
-    "di wilayah oksipital, yang berkaitan dengan pemrosesan informasi visual dan perhatian "
-    "terhadap isyarat sosial seperti kontak mata. Hal ini menunjukkan bahwa ekstrovert lebih "
-    "responsif terhadap isyarat sosial selama interaksi interpersonal."
+        "Selain itu, studi oleh Roslan et al. (2019) menunjukkan bahwa selama interaksi tatap muka, "
+        "individu dengan tingkat Extraversion yang tinggi menunjukkan koherensi alfa yang lebih besar "
+        "di wilayah oksipital, yang berkaitan dengan pemrosesan informasi visual dan perhatian "
+        "terhadap isyarat sosial seperti kontak mata. Hal ini menunjukkan bahwa ekstrovert lebih "
+        "responsif terhadap isyarat sosial selama interaksi interpersonal."
 
-    "<br/><br/>"
+        "<br/><br/>"
 
-    "Lebih lanjut, meta-analisis oleh Wang et al. (2025) mengidentifikasi bahwa Extraversion "
-    "berkorelasi positif dengan aktivasi di gyrus frontal inferior kanan dan insula selama "
-    "pemrosesan afek positif, serta aktivasi di gyrus angular kanan dan gyrus precentral kiri. "
-    "Temuan ini menunjukkan bahwa ekstrovert memiliki respons neural yang lebih kuat terhadap "
-    "rangsangan emosional positif, yang mendukung kecenderungan mereka untuk mencari "
-    "pengalaman yang menyenangkan dan interaksi sosial."
+        "Lebih lanjut, meta-analisis oleh Wang et al. (2025) mengidentifikasi bahwa Extraversion "
+        "berkorelasi positif dengan aktivasi di gyrus frontal inferior kanan dan insula selama "
+        "pemrosesan afek positif, serta aktivasi di gyrus angular kanan dan gyrus precentral kiri. "
+        "Temuan ini menunjukkan bahwa ekstrovert memiliki respons neural yang lebih kuat terhadap "
+        "rangsangan emosional positif, yang mendukung kecenderungan mereka untuk mencari "
+        "pengalaman yang menyenangkan dan interaksi sosial."
     )
     
     #isi hasil generate AI
-    generate_ai = (
+    person_fit_job = (
         ""
     )
     
@@ -725,7 +707,7 @@ if __name__ == "__main__":
     )
 
     referensi_text_2 = (
-        "Jawinski, P., et al. (2021). The Big Five Personality Traits and Brain Arousal in the Resting State. "
+    "Jawinski, P., et al. (2021). The Big Five Personality Traits and Brain Arousal in the Resting State. "
     "Psychophysiology, 58(1), e13722. https://pubmed.ncbi.nlm.nih.gov/34679337/\n\n"
 
     "Jensen, O., & Tesche, C. D. (2002). Frontal theta activity in humans increases with memory load in a "
@@ -874,8 +856,8 @@ if __name__ == "__main__":
     halaman_3(c, behavior_traits_text_2, page_num=3)
     halaman_4(c, cognitive_traits_text, page_num=4)
     halaman_5(c, behavior_traits_text_2, "topoplot2.png",judul_topoplot2, page_num=5)
-    halaman_6(c, generate_ai, page_num=6)
-    halaman_7(c, generate_ai, page_num=7)
+    halaman_6(c, person_fit_job, page_num=6)
+    halaman_7(c, person_fit_job, page_num=7)
     halaman_8(c, referensi_text_1, page_num=8)
     halaman_9(c, referensi_text_2, page_num=9)
     halaman_10(c, referensi_text_3, page_num=10)
