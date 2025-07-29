@@ -1,4 +1,4 @@
-# models.py
+# models.py (Versi Terbaru)
 
 # Import komponen yang dibutuhkan dari sqlalchemy
 from sqlalchemy import (
@@ -47,6 +47,7 @@ class User(Base):
     fit_jobs = relationship("FitJob", back_populates="user", cascade="all, delete-orphan")
     develops = relationship("Develop", back_populates="user", cascade="all, delete-orphan")
     privileges = relationship("Privilege", back_populates="user", cascade="all, delete-orphan")
+    roc_curves = relationship("ROCCurve", back_populates="user", cascade="all, delete-orphan")
 
 # ==============================================================================
 #  2. TABEL LOOKUP (MASTER DATA)
@@ -83,7 +84,7 @@ class Stimulation(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
-    title_graph = Column(String(255), nullable=True)
+    # --- KOLOM title_graph DIHAPUS ---
 
     user_response_data = relationship("UserResponse", back_populates="stimulation")
 
@@ -107,9 +108,6 @@ class UserPersonality(Base):
     
     user = relationship("User", back_populates="personalities_data")
     personality = relationship("Personality", back_populates="user_personalities")
-
-# ... (Kelas UserPersonalityAccuracy, UserCognitive, UserSplitBrain, UserResponse, FitJob, Develop, Privilege tetap sama persis seperti sebelumnya) ...
-# (Saya singkat di sini agar tidak terlalu panjang, cukup salin dari kode sebelumnya)
 
 class UserPersonalityAccuracy(Base):
     __tablename__ = "user_personality_accuracies"
@@ -157,7 +155,7 @@ class UserResponse(Base):
     stress = Column(Float)
     relax = Column(Float)
     focus = Column(Float)
-    graph = Column(String(255))
+    # --- KOLOM graph DIHAPUS ---
     user = relationship("User", back_populates="response_data")
     stimulation = relationship("Stimulation", back_populates="user_response_data")
 
@@ -183,6 +181,16 @@ class Privilege(Base):
     reason = Column(Text)
     user = relationship("User", back_populates="privileges")
 
+class ROCCurve(Base):
+    """Menyimpan path dan informasi untuk grafik ROC yang dihasilkan."""
+    __tablename__ = "roc_curves"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    graph = Column(String(255), nullable=False)
+    note = Column(Text, nullable=True)
+
+    user = relationship("User", back_populates="roc_curves")
 
 # --- Fungsi untuk membuat semua tabel di database ---
 def create_all_tables():

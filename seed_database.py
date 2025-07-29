@@ -1,3 +1,5 @@
+# seed_database.py (Versi Terbaru)
+
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
@@ -23,19 +25,19 @@ PERSONALITY_DATA = [
     {"name": "Neuroticism", "title": "Kecenderungan Emosi Kuat", "description": "Sangat responsif terhadap hal-hal yang memicu emosi negatif(seperti rasa khawatir, takut, atau frustasi)", "explanation": "X adalah orang yang memilki tendensi stabilitas emosional yang tidak terlalu baikdan terkadang mungkin mencemaskan beberapa hal. Tidak jarang ia juga dikenal orang yang sensitif"},
 ]
 
-# --- Data untuk tabel 'stimulations' ---
+# --- Data untuk tabel 'stimulations' (key "title_graph" dihapus) ---
 STIMULATION_DATA = [
-    {"name": "Open Eyes", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Closed Eyes", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Autobiography", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Openess", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Conscientiousness", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Extraversion", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Agreeableness", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Neuroticism", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Kraepelin", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "WCST", "title_graph": "Cognitive Function Test - Digit Span"},
-    {"name": "Digit Span", "title_graph": "Cognitive Function Test - Digit Span"},
+    {"name": "Open Eyes"},
+    {"name": "Closed Eyes"},
+    {"name": "Autobiography"},
+    {"name": "Openess"},
+    {"name": "Conscientiousness"},
+    {"name": "Extraversion"},
+    {"name": "Agreeableness"},
+    {"name": "Neuroticism"},
+    {"name": "Kraepelin"},
+    {"name": "WCST"},
+    {"name": "Digit Span"},
 ]
 
 # --- 2. Data untuk Akun Admin ---

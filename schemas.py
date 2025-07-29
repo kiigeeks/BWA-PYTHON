@@ -1,4 +1,4 @@
-# file: schemas.py
+# file: schemas.py (Versi Terbaru)
 
 from pydantic import BaseModel, Field
 from typing import Optional, List, TypeVar, Generic
@@ -28,7 +28,7 @@ class TokenPayload(BaseModel):
 
 
 # ==================================
-# SKEMA UNTUK DATA RELASI (NESTED) - (TIDAK ADA PERUBAHAN)
+# SKEMA UNTUK DATA RELASI (NESTED)
 # ==================================
 
 class UserPersonality(BaseModel):
@@ -74,7 +74,7 @@ class UserResponse(BaseModel):
     stress: Optional[float] = None
     relax: Optional[float] = None
     focus: Optional[float] = None
-    graph: Optional[str] = None
+    # --- FIELD graph DIHAPUS ---
 
     class Config:
         from_attributes = True
@@ -98,8 +98,15 @@ class Privilege(BaseModel):
     class Config:
         from_attributes = True
 
+class ROCCurve(BaseModel):
+    graph: str
+    note: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 # ==================================
-# SKEMA UTAMA USER (DENGAN RELASI) - (TIDAK ADA PERUBAHAN)
+# SKEMA UTAMA USER (DENGAN RELASI)
 # ==================================
 
 class User(BaseModel):
@@ -126,18 +133,13 @@ class User(BaseModel):
     fit_jobs: List[FitJob] = []
     develops: List[Develop] = []
     privileges: List[Privilege] = []
+    roc_curves: List[ROCCurve] = []
 
     class Config:
         from_attributes = True
 
-# Skema Token yang lama sudah tidak diperlukan untuk response, digantikan oleh TokenPayload & StandardResponse
-# class Token(BaseModel):
-#     message: str
-#     access_token: str
-#     token_type: str
-
 # ==================================
-# SKEMA UNTUK HASIL ANALISIS (TIDAK ADA PERUBAHAN)
+# SKEMA UNTUK HASIL ANALISIS
 # ==================================
 class AnalysisBigFive(BaseModel):
     PERSONALITY: str
@@ -182,7 +184,7 @@ class AnalysisResult(BaseModel):
     personality_accuracy: List[AnalysisPersonalityAccuracy]
     response_during_test: List[AnalysisResponse]
     topoplot_urls: dict[str, str]
-    lineplot_urls: dict[str, str]
+    roc_curve_urls: dict[str, str]
 
 class FilePathPayload(BaseModel):
     """
