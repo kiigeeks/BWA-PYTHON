@@ -171,7 +171,7 @@ def draw_centered_image(c, img_path, y_top, width_mm):
 
 def halaman_1_cover(c, biodata, executive_summary_text, page_num):
     draw_watermark(c, "cia_watermark.png")
-    draw_header(c, is_cover=True)
+    draw_header(c)
 
     c.setFont("Times-Bold", 18)
     c.setFillColorRGB(0, 0.2, 0.6)
