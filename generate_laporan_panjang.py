@@ -1,14 +1,116 @@
+# -*- coding: utf-8 -*-
+
+# ==============================================================================
+# BAGIAN 1: IMPORT LIBRARY
+# ==============================================================================
+import requests
+import json
+import re
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.lib.colors import Color, black, white
-from textwrap import wrap
+from reportlab.lib.colors import Color, black
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
 
+# ==============================================================================
+# BAGIAN 2: KONSTANTA GLOBAL
+# ==============================================================================
 PAGE_WIDTH, PAGE_HEIGHT = A4
+
+# ==============================================================================
+# BAGIAN 3: FUNGSI GENERASI KONTEN AI
+# ==============================================================================
+
+def extract_relevant_data(full_text, keywords):
+    """
+    Mengekstrak bagian teks yang relevan dari bank_data berdasarkan daftar keyword.
+    """
+    all_headings = [
+        "Openness", "Openess", "Conscientiousness", "Extraversion",
+        "Agreeableness", "Neuroticism", "Kraepelin Test (Numerik)",
+        "WCST (Logika)", "Digit Span (Short Term Memory)", "EXECUTIVE SUMMARY"
+    ]
+    full_text = full_text.replace("Openess \n", "Openness\n")
+
+    extracted_chunks = []
+    for keyword in keywords:
+        try:
+            start_index = full_text.index(keyword)
+            end_index = len(full_text)
+            for heading in all_headings:
+                found_pos = full_text.find(heading, start_index + 1)
+                if found_pos != -1:
+                    end_index = min(end_index, found_pos)
+            chunk = full_text[start_index:end_index].strip()
+            extracted_chunks.append(chunk)
+        except ValueError:
+            print(f"Peringatan: Keyword '{keyword}' tidak ditemukan di bank_data.txt")
+    return "\n\n".join(extracted_chunks)
+
+def generate_ai_content(prompt, model="llama3", task_name="AI Task"):
+    """
+    Fungsi generik untuk berinteraksi dengan model AI Ollama.
+    Versi ini memiliki pembersih otomatis untuk menghapus kalimat pembuka yang tidak diinginkan.
+    """
+    try:
+        print(f"-> Mengirim request untuk '{task_name}' ke model {model}...")
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.1, "top_p": 0.8, "num_predict": 2000,
+                    "repeat_penalty": 1.2, "stop": ["Data referensi:", "Tugas:", "Instruksi:"]
+                }
+            },
+            timeout=300
+        )
+        if response.status_code == 200:
+            result = response.json()
+            generated_text = result.get("response", "").strip()
+
+            if not generated_text:
+                return f"Error: Model tidak menghasilkan response untuk {task_name}."
+
+            # --- BLOK PEMBERSIH OTOMATIS ---
+            # Daftar kalimat pembuka yang akan dideteksi dan dihapus
+            boilerplate_phrases = [
+                "Berikut adalah ringkasan profil kandidat yang padat, lugas, dan profesional:",
+                "Berikut adalah analisisnya:",
+                "Tentu, berikut adalah analisisnya:",
+                "Here is the analysis:",
+                "Here's the analysis:",
+                "Sebagai seorang konsultan SDM profesional,",
+                "Sebagai seorang analis karir,"
+            ]
+            
+            # Periksa setiap frasa dan hapus jika ditemukan di awal jawaban
+            for phrase in boilerplate_phrases:
+                # Menggunakan lower() untuk perbandingan case-insensitive
+                if generated_text.lower().strip().startswith(phrase.lower()):
+                    # Hapus frasa tersebut dari awal teks
+                    generated_text = generated_text[len(phrase):].lstrip(' :')
+                    print(f"   -- Kalimat pembuka terdeteksi dan dibersihkan.")
+                    break # Hentikan setelah menemukan satu kecocokan
+            # --------------------------------
+
+            print(f"   -- Berhasil meng-generate '{task_name}'.")
+            return generated_text
+
+        return f"Error: HTTP {response.status_code} - {response.text}"
+    except requests.exceptions.ConnectionError:
+        return "Error: Tidak bisa connect ke Ollama server. Pastikan 'ollama serve' sudah jalan."
+    except Exception as e:
+        return f"Error saat generate {task_name}: {str(e)}"
+
+# ==============================================================================
+# BAGIAN 4: FUNGSI-FUNGSI UNTUK MENGGAMBAR PDF
+# ==============================================================================
 
 def draw_watermark(c, watermark_path):
     try:
@@ -36,20 +138,17 @@ def draw_header(c, logo_path="cia.png", is_cover=False):
     except Exception as e:
         print(f"Logo gagal dimuat: {e}")
 
-    # --- Teks Alamat dan Judul ---
     c.setFont("Times-Bold", 14)
     c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 20 * mm, "CENTRAL IMPROVEMENT ACADEMY")
-
     c.setFont("Times-Roman", 12)
     c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 25 * mm, "Jl. Balikpapan No.27, RT.9/RW.6, Petojo Sel.,")
     c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 30 * mm, "Kecamatan Gambir, Jakarta Pusat")
     c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 35 * mm, "0811-3478-000")
 
-    # --- Garis Horizontal Hitam Tebal ---
     if not is_cover:
-        c.setLineWidth(4)  # garis lebih tebal dari default (0.5)
+        c.setLineWidth(4)
         c.setStrokeColor(black)
-        garis_y = PAGE_HEIGHT - 42 * mm  # posisinya di bawah alamat
+        garis_y = PAGE_HEIGHT - 42 * mm
         c.line(25 * mm, garis_y, PAGE_WIDTH - 25 * mm, garis_y)
 
 def draw_footer(c, page_num):
@@ -66,94 +165,13 @@ def draw_centered_image(c, img_path, y_top, width_mm):
         y = y_top - height
         c.drawImage(img_path, x, y, width=width, height=height, mask='auto')
         return y
-    except:
-        print(f"Gambar '{img_path}' tidak ditemukan.")
+    except Exception as e:
+        print(f"Gambar '{img_path}' tidak ditemukan atau gagal dimuat: {e}")
         return y_top - 100
 
-def halaman_1_cover(c, biodata, topoplot1, topoplot2, page_num):
+def halaman_1_cover(c, biodata, executive_summary_text, page_num):
     draw_watermark(c, "cia_watermark.png")
-    draw_header(c)
-
-    # === Judul Tengah ===
-    c.setFont("Times-Bold", 18)
-    c.setFillColorRGB(0, 0.2, 0.6)
-    c.drawCentredString(PAGE_WIDTH / 2, PAGE_HEIGHT - 150, "BRAIN WAVE PROFILING")  # turunkan dari -80 → -115
-    c.setFillColor(black)
-
-    # === Biodata ===
-    c.setFont("Times-Roman", 12)
-    y = PAGE_HEIGHT - 170  # diturunkan dari -95 → -135 agar tidak menabrak logo
-    for label, value in biodata.items():
-        c.drawString(60, y, f"{label}")
-        c.drawString(180, y, f": {value}")
-        y -= 16
-
-    # === EXECUTIVE SUMMARY ===
-    c.setFont("Times-Bold", 12)
-    c.drawString(60, y - 15, "EXECUTIVE SUMMARY")
-
-    # === Footer ===
-    draw_footer(c, page_num)
-    c.showPage()
-    
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
-from reportlab.lib.utils import ImageReader
-from reportlab.lib.colors import Color, black
-from reportlab.platypus import Paragraph
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_JUSTIFY
-
-PAGE_WIDTH, PAGE_HEIGHT = A4
-
-def draw_watermark(c, watermark_path):
-    try:
-        img = ImageReader(watermark_path)
-        iw, ih = img.getSize()
-        w_target = 130 * mm
-        h_target = w_target * ih / iw
-        x = (PAGE_WIDTH - w_target) / 2
-        y = (PAGE_HEIGHT - h_target) / 2
-        c.saveState()
-        c.drawImage(img, x, y, width=w_target, height=h_target, mask='auto')
-        c.restoreState()
-    except Exception as e:
-        print(f"⚠️ Watermark gagal dimuat: {e}")
-
-def draw_header(c, logo_path="cia.png", is_cover=False):
-    try:
-        img = ImageReader(logo_path)
-        iw, ih = img.getSize()
-        w_target = 50 * mm
-        h_target = w_target * ih / iw
-        x = 20 * mm
-        y = PAGE_HEIGHT - h_target - 10 * mm
-        c.drawImage(img, x, y, width=w_target, height=h_target, mask='auto')
-    except Exception as e:
-        print(f"Logo gagal dimuat: {e}")
-
-    c.setFont("Times-Bold", 14)
-    c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 20 * mm, "CENTRAL IMPROVEMENT ACADEMY")
-
-    c.setFont("Times-Roman", 12)
-    c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 25 * mm, "Jl. Balikpapan No.27, RT.9/RW.6, Petojo Sel.,")
-    c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 30 * mm, "Kecamatan Gambir, Jakarta Pusat")
-    c.drawRightString(PAGE_WIDTH - 25 * mm, PAGE_HEIGHT - 35 * mm, "0811-3478-000")
-
-    if not is_cover:
-        c.setLineWidth(4)
-        c.setStrokeColor(black)
-        garis_y = PAGE_HEIGHT - 42 * mm
-        c.line(25 * mm, garis_y, PAGE_WIDTH - 25 * mm, garis_y)
-
-def draw_footer(c, page_num):
-    c.setFont("Times-Roman", 12)
-    c.drawRightString(PAGE_WIDTH - 10 * mm, 10 * mm, f"{page_num}")
-
-def halaman_1_cover(c, biodata, executive_summary_text, topoplot1, topoplot2, page_num):
-    draw_watermark(c, "cia_watermark.png")
-    draw_header(c)
+    draw_header(c, is_cover=True)
 
     c.setFont("Times-Bold", 18)
     c.setFillColorRGB(0, 0.2, 0.6)
@@ -173,58 +191,45 @@ def halaman_1_cover(c, biodata, executive_summary_text, topoplot1, topoplot2, pa
     y -= 15
 
     style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=14,
-        alignment=TA_JUSTIFY,
+        name="JustifySmall", fontName="Times-Roman", fontSize=12,
+        leading=14, alignment=TA_JUSTIFY
     )
-
     summary_para = Paragraph(executive_summary_text, style)
     w, h = summary_para.wrap(PAGE_WIDTH - 2 * 60, 200)
     summary_para.drawOn(c, 60, y - h)
 
     draw_footer(c, page_num)
     c.showPage()
-    
+
 def halaman_2(c, behavior_traits_text, topoplot1, judul_topoplot1, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
-
-    # Judul
     y_start = PAGE_HEIGHT - 170
     c.setFont("Times-Bold", 12)
     c.drawString(60, y_start, "BEHAVIOR TRAITS PROFILE")
 
-    # Text Summary
     style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=14,
-        alignment=TA_JUSTIFY,
+        name="JustifySmall", fontName="Times-Roman", fontSize=12,
+        leading=14, alignment=TA_JUSTIFY
     )
     summary_para = Paragraph(behavior_traits_text, style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
+    max_text_width = PAGE_WIDTH - 2 * 60
     w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
-    
-    y_text = y_start - 20  # padding bawah judul
+    y_text = y_start - 20
     summary_para.drawOn(c, 60, y_text - h)
 
-    # --- Gambar Topoplot 1 di bawah teks ---
-    padding_after_text = 20  # padding setelah paragraf
+    padding_after_text = 20
     y_topoplot1 = y_text - h - padding_after_text
     y = draw_centered_image(c, topoplot1, y_topoplot1, 180)
 
-    judul_topoplot1 = Paragraph(judul_topoplot1,style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
-    w, h = judul_topoplot1.wrap(max_text_width, PAGE_HEIGHT)
-    y_judul_topoplot1 = y - h - 10  # padding atas
-    judul_topoplot1.drawOn(c, 60, y_judul_topoplot1)
+    judul_para = Paragraph(judul_topoplot1, style)
+    w_judul, h_judul = judul_para.wrap(max_text_width, PAGE_HEIGHT)
+    y_judul_topoplot1 = y - h_judul - 10
+    judul_para.drawOn(c, 60, y_judul_topoplot1)
 
     draw_footer(c, page_num)
     c.showPage()
-    
+
 def halaman_3(c, behavior_traits_text_2, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
@@ -250,7 +255,7 @@ def halaman_3(c, behavior_traits_text_2, page_num):
     draw_footer(c, page_num)
     c.showPage()
 
-def halaman_4(c,cognitive_traits_text, page_num):
+def halaman_4(c, cognitive_traits_text, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
@@ -276,8 +281,8 @@ def halaman_4(c,cognitive_traits_text, page_num):
 
     draw_footer(c, page_num)
     c.showPage()
-    
-def halaman_5(c, cognitive_traits_text_2,topoplot2,judul_topoplot2 ,page_num):
+
+def halaman_5(c, cognitive_traits_text_2, topoplot2, judul_topoplot2, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
@@ -312,65 +317,41 @@ def halaman_5(c, cognitive_traits_text_2,topoplot2,judul_topoplot2 ,page_num):
 
     draw_footer(c, page_num)
     c.showPage()
-    
-def halaman_6(c, person_fit_job,page_num):
+
+def halaman_person_fit_job(c, person_fit_job_text, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
     # Judul
-    y_start = PAGE_HEIGHT - 170
+    y_pos = PAGE_HEIGHT - 170
     c.setFont("Times-Bold", 12)
-    c.drawString(60, y_start, "PERSON TO FIT BIDANG KERJA/USAHA")
+    c.drawString(60, y_pos, "PERSON TO FIT BIDANG KERJA/USAHA")
     
+    # Beri sedikit jarak setelah judul
+    y_pos -= 30
+
+    # Definisikan style untuk paragraf yang akan merender HTML
     style = ParagraphStyle(
-        name="JustifySmall",
+        name="JobFitStyle",
         fontName="Times-Roman",
         fontSize=12,
-        leading=14,
+        leading=16,  # Beri jarak antar baris yang cukup
         alignment=TA_JUSTIFY,
+        spaceAfter=6
     )
-    # INPUT HASIL GENERATE AI DISINI
-    #
-    #
-    #
-    summary_para = Paragraph(person_fit_job, style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
-    w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
-    #
-    #
-    #
-    y_text = y_start - 20  # padding bawah judul
-    summary_para.drawOn(c, 60, y_text - h)
 
-    draw_footer(c, page_num)
-    c.showPage()
+    # Buat objek Paragraph dari teks yang dihasilkan AI
+    # Objek ini akan menginterpretasikan tag <b> dan <br/>
+    p = Paragraph(person_fit_job_text, style)
 
-def halaman_7(c, person_fit_job,page_num):
-    draw_watermark(c, "cia_watermark.png")
-    draw_header(c)
+    # Tentukan lebar area teks dan gambar ke kanvas
+    margin_horizontal = 60
+    text_width = PAGE_WIDTH - (2 * margin_horizontal)
     
-    y_start = PAGE_HEIGHT - 170
-    
-    style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=14,
-        alignment=TA_JUSTIFY,
-    )
-    # INPUT HASIL GENERATE AI DISINI
-    #
-    #
-    #
-    summary_para = Paragraph(person_fit_job, style)
-    max_text_width = PAGE_WIDTH - 2 * 60  # margin kiri-kanan
-    w, h = summary_para.wrap(max_text_width, PAGE_HEIGHT)
-    #
-    #
-    #
-    y_text = y_start - 20  # padding bawah judul
-    summary_para.drawOn(c, 60, y_text - h)
-    
+    # Hitung tinggi yang dibutuhkan dan gambar paragrafnya
+    w, h = p.wrapOn(c, text_width, y_pos)
+    p.drawOn(c, margin_horizontal, y_pos - h)
+
     draw_footer(c, page_num)
     c.showPage()
 
@@ -492,11 +473,98 @@ def halaman_11(c, disclaimer_text, page_num):
     draw_footer(c, page_num)
     c.showPage()
 
-
-
+# ==============================================================================
+# BAGIAN 5: EKSEKUSI UTAMA
+# ==============================================================================
 if __name__ == "__main__":
-    c = canvas.Canvas("laporan_panjang.pdf", pagesize=A4)
 
+    # --------------------------------------------------------------------------
+    # A: KONFIGURASI
+    # --------------------------------------------------------------------------
+    TIPE_KEPRIBADIAN = "Conscientiousness"
+    KOGNITIF_UTAMA_KEY = "WCST (Logika)" 
+    PEKERJAAN = "Supervisor dan Tax Accounting"
+    MODEL_AI = "llama3"
+    NAMA_FILE_OUTPUT = "laporan_profiling_lengkap.pdf"
+    
+    KOGNITIF_MAP = {
+        "Kraepelin Test (Numerik)": "Working Memory",
+        "WCST (Logika)": "Pemikiran Logis",
+        "Digit Span (Short Term Memory)": "Memori Jangka Pendek"
+    }
+    kognitif_utama_display_name = KOGNITIF_MAP.get(KOGNITIF_UTAMA_KEY, KOGNITIF_UTAMA_KEY)
+
+    # --------------------------------------------------------------------------
+    # B: TEMPLATE PROMPT AI
+    # --------------------------------------------------------------------------
+
+    # B: TEMPLATE PROMPT AI (Versi Final dengan Contoh/Few-Shot)
+    PROMPT_TEMPLATES = {
+        "executive_summary_narrative": """
+        Anda adalah seorang konsultan SDM profesional. Tugas Anda adalah menulis paragraf Executive Summary yang analitis dan padat.
+
+        ---
+        **CONTOH OUTPUT YANG DIINGINKAN:**
+
+        **Input Data Contoh:**
+        - Tipe Kepribadian Utama: Openness
+        - Kekuatan Kognitif Utama: Working Memory
+        - Posisi yang Dilamar: Creative Director
+
+        **Contoh Paragraf Summary:**
+        Individu ini menunjukkan profil kepribadian **Openness** yang kuat, ditandai dengan rasa ingin tahu yang tinggi, imajinasi, dan keterbukaan terhadap ide-ide baru. Didukung oleh kekuatan kognitif pada **Working Memory**, ia mampu mengelola banyak informasi secara bersamaan dan fleksibel dalam berpikir. Kombinasi ini menciptakan sinergi yang sangat baik untuk posisi **Creative Director**, di mana kemampuan untuk menghasilkan konsep-konsep inovatif (Openness) sambil mengelola detail proyek yang kompleks (Working Memory) adalah kunci. Potensi tantangan mungkin muncul dalam tugas-tugas yang sangat repetitif. Secara keseluruhan, profil ini dinilai **Sangat Cocok** untuk peran yang menuntut kreativitas dan pemikiran dinamis.
+        ---
+
+        **SEKARANG, TUGAS ANDA:**
+        Buatlah Executive Summary untuk data di bawah ini. Tiru **GAYA PENULISAN, STRUKTUR, dan KUALITAS ANALISIS** dari contoh di atas.
+
+        **Data yang Harus Dianalisis:**
+        - Tipe Kepribadian Utama: {tipe_kepribadian}
+        - Kekuatan Kognitif Utama: {kognitif_utama}
+        - Posisi yang Dilamar: {pekerjaan}
+        - Konteks Tambahan dari Tes: {specific_context}
+
+        **ATURAN MUTLAK**: Langsung tulis paragrafnya. Jangan sertakan pengantar atau pengulangan instruksi.
+        """,
+
+        "person_job_fit_full": """
+    Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja.
+
+    ==============================
+    CONTOH SEBAGAI REFERENSI GAYA DAN FORMAT:
+    (Perhatikan penggunaan **...** untuk judul dan baris kosong untuk spasi)
+    ==============================
+    Individu dengan kepribadian yang ramah dan energik, dikombinasikan dengan kekuatan kognitif yang efisien, cenderung unggul dalam lingkungan kerja yang dinamis dan kolaboratif. Mereka mampu berinteraksi dengan banyak orang sambil tetap mengingat detail-detail penting dari percakapan.
+
+    **Manajer Penjualan (Sales Manager):** Peran ini membutuhkan kemampuan membangun relasi dan melacak banyak prospek serta target penjualan secara bersamaan.
+
+    **Event Organizer:** Kemampuan untuk berkoordinasi dengan banyak vendor dan peserta sambil mengelola jadwal dan logistik yang rumit membuat peran ini sangat cocok.
+
+    **Public Relations Specialist:** Berinteraksi dengan media dan publik secara efektif sambil mengingat poin-poin pesan utama dan data pendukung adalah inti dari pekerjaan ini.
+
+    Secara keseluruhan, individu dengan profil ini sangat cocok untuk peran yang berorientasi pada manusia, serba cepat, dan membutuhkan kemampuan multitasking yang tinggi dalam komunikasi.
+    ==============================
+    AKHIR DARI CONTOH
+    ==============================
+
+    SEKARANG, TUGAS ANDA:
+    Buatlah analisis untuk profil di bawah ini. Ikuti **PERSIS** format Markdown dan kualitas penjelasan dari contoh di atas.
+
+    PROFIL UNTUK DIANALISIS:
+    - Kepribadian Dominan: {tipe_kepribadian}
+    - Kekuatan Kognitif: {kognitif_utama}
+
+    ATURAN MUTLAK:
+    - Gunakan Bahasa Indonesia.
+    - Gunakan `**Judul Pekerjaan:**` untuk membuat teks tebal.
+    - Gunakan **satu baris kosong** untuk membuat spasi antar paragraf atau antar item pekerjaan.
+    - JANGAN gunakan tag HTML (`<b>`, `<br/>`).
+    - Langsung mulai dengan paragraf pembuka tanpa pengantar apa pun.
+    """
+    }
+    # --------------------------------------------------------------------------
+    # C: KONTEN STATIS UNTUK LAPORAN
+    # --------------------------------------------------------------------------
     biodata = {
         "Nama": "Denny Setiyawan",
         "Jenis kelamin": "Laki Laki",
@@ -507,11 +575,8 @@ if __name__ == "__main__":
         "Tempat Test": "Hotel Transformer Center, Batu, Jawa Timur.",
         "Operator": "Ahmad Marzuki S.Kom"
     }
-
-    executive_summary_text = (
-        ""
-    )
-
+    
+    # Teks ini tetap statis sesuai file asli
     behavior_traits_text = (
         "Hasil analisis EEG menunjukkan bahwa individu dengan tingkat Extraversion yang tinggi "
         "cenderung memiliki aktivitas otak yang khas. Penelitian oleh Tran et al. (2001) menemukan "
@@ -540,14 +605,7 @@ if __name__ == "__main__":
         "pengalaman yang menyenangkan dan interaksi sosial."
     )
     
-    #isi hasil generate AI
-    person_fit_job = (
-        ""
-    )
-    
-    judul_topoplot1 = (
-       "<b>Gambar 1. Topografi response Yudanta Adhipramana terhadap stimulus behavioral trait extraversion</b> "
-    )
+    judul_topoplot1 = "<b>Gambar 1. Topografi response Yudanta Adhipramana terhadap stimulus behavioral trait extraversion</b>"
     
     behavior_traits_text_2 = (
         "Individu dengan tingkat Exraversion yang tinggi dikenal karena sifat sosial, energik, dan " 
@@ -567,6 +625,7 @@ if __name__ == "__main__":
         "positif dalam interaksi sosial dapat memperkuat kecenderungan ekstrovert dan meningkatkan " 
         "kesejahteraan psikologis secara keseluruhan. "
     )
+
     cognitive_traits_text = (
         "Hasil tes EEG pada stimulus yang menguji memori jangka pendek menunjukkan pola respons "
         "elektrofisiologis yang lebih kuat pada gelombang theta dan alpha, yang berhubungan dengan "
@@ -616,7 +675,7 @@ if __name__ == "__main__":
         "lebih efisien dalam menyelesaikan tugas-tugas yang membutuhkan ketahanan memori."
     )
     
-    behavior_traits_text_2 = (
+    cognitive_traits_text_2 = (
         "Hasil penelitian EEG menunjukkan bahwa kanal-kanal yang terlibat dalam memori jangka "
         "pendek, seperti P3 dan O1, berfungsi dalam konteks pengolahan informasi visual dan verbal "
         "dalam waktu yang singkat. Peningkatan aktivitas gelombang theta dan alpha di area posterior "
@@ -627,9 +686,7 @@ if __name__ == "__main__":
         "pengingatan informasi dengan durasi singkat."
     )
     
-    judul_topoplot2 = (
-        "<b>Gambar 2.Brain topografi Brain Wave Analysis Power stimulus digit span</b> "
-    )
+    judul_topoplot2 = "<b>Gambar 2.Brain topografi Brain Wave Analysis Power stimulus digit span</b>"
     
     referensi_text_1 = (
         "Alloway, T. P., Gathercole, S. E., & Pickering, S. J. (2009). The cognitive and behavioral "
@@ -690,121 +747,121 @@ if __name__ == "__main__":
         "Management. "
         "https://www.researchgate.net/publication/324485496_Personality_and_Job_Performance_A_Relational_Perspective"
         "Jawinski, P., et al. (2021). The Big Five Personality Traits and Brain Arousal in the Resting State. "
-    "Psychophysiology, 58(1), e13722. https://pubmed.ncbi.nlm.nih.gov/34679337/\n\n"
+        "Psychophysiology, 58(1), e13722. https://pubmed.ncbi.nlm.nih.gov/34679337/\n\n"
 
-    "Jensen, O., & Tesche, C. D. (2002). Frontal theta activity in humans increases with memory load in a "
-    "working memory task. European Journal of Neuroscience, 15(8), 1395–1399. "
-    "https://doi.org/10.1046/j.1460-9568.2002.01975.x\n\n"
+        "Jensen, O., & Tesche, C. D. (2002). Frontal theta activity in humans increases with memory load in a "
+        "working memory task. European Journal of Neuroscience, 15(8), 1395–1399. "
+        "https://doi.org/10.1046/j.1460-9568.2002.01975.x\n\n"
 
-    "Klimesch, W. (1996). Memory processes, brain oscillations and EEG synchronization. International "
-    "Journal of Psychophysiology, 24(1-2), 61-100. https://doi.org/10.1016/0167-8760(96)00043-4\n\n"
+        "Klimesch, W. (1996). Memory processes, brain oscillations and EEG synchronization. International "
+        "Journal of Psychophysiology, 24(1-2), 61-100. https://doi.org/10.1016/0167-8760(96)00043-4\n\n"
 
-    "Klimesch, W. (1999). EEG alpha and theta oscillations reflect cognitive and memory performance: A "
-    "review analysis. Brain Research Reviews, 29(2-3), 169-195. "
-    "https://doi.org/10.1016/S0165-0173(98)00056-4\n\n"
+        "Klimesch, W. (1999). EEG alpha and theta oscillations reflect cognitive and memory performance: A "
+        "review analysis. Brain Research Reviews, 29(2-3), 169-195. "
+        "https://doi.org/10.1016/S0165-0173(98)00056-4\n\n"
 
-    "Knyazev, G. G., et al. (2005). Personality traits and its association with resting regional brain activity. "
-    "International Journal of Psychophysiology, 55(2). https://pubmed.ncbi.nlm.nih.gov/16019096/\n\n"
+        "Knyazev, G. G., et al. (2005). Personality traits and its association with resting regional brain activity. "
+        "International Journal of Psychophysiology, 55(2). https://pubmed.ncbi.nlm.nih.gov/16019096/\n\n"
 
-    "Knyazev, G. G., et al. (2007). Personality, gender and brain oscillations. International Journal of "
-    "Psychophysiology, 66(1), 45-51. https://pubmed.ncbi.nlm.nih.gov/17761331/\n\n"
+        "Knyazev, G. G., et al. (2007). Personality, gender and brain oscillations. International Journal of "
+        "Psychophysiology, 66(1), 45-51. https://pubmed.ncbi.nlm.nih.gov/17761331/\n\n"
 
-    "Li, J., et al. (2021). Big five personality trait analysis from random eeg signal using convolutional "
-    "neural network. IEEE Transactions on Affective Computing.\n\n"
+        "Li, J., et al. (2021). Big five personality trait analysis from random eeg signal using convolutional "
+        "neural network. IEEE Transactions on Affective Computing.\n\n"
 
-    "Li, W., et al. (2017). Neuronal correlates of individual differences in the Big Five personality traits: "
-    "Evidences from cortical morphology and functional homogeneity. Frontiers in Neuroscience, 11, 414. "
-    "https://www.frontiersin.org/articles/10.3389/fnins.2017.00414/full\n\n"
+        "Li, W., et al. (2017). Neuronal correlates of individual differences in the Big Five personality traits: "
+        "Evidences from cortical morphology and functional homogeneity. Frontiers in Neuroscience, 11, 414. "
+        "https://www.frontiersin.org/articles/10.3389/fnins.2017.00414/full\n\n"
 
-    "Liu, H., et al. (2022). Design and implementation of an EEG-based recognition mechanism for the "
-    "openness trait of the Big Five. Journal of Neuroscience Methods.\n\n"
+        "Liu, H., et al. (2022). Design and implementation of an EEG-based recognition mechanism for the "
+        "openness trait of the Big Five. Journal of Neuroscience Methods.\n\n"
 
-    "Liu, X., et al. (2018). Connecting Openness and the Resting-State Brain Network: A Discover-Validate "
-    "Approach. Frontiers in Neuroscience, 12, 762. "
-    "https://www.frontiersin.org/articles/10.3389/fnins.2018.00762/full\n\n"
+        "Liu, X., et al. (2018). Connecting Openness and the Resting-State Brain Network: A Discover-Validate "
+        "Approach. Frontiers in Neuroscience, 12, 762. "
+        "https://www.frontiersin.org/articles/10.3389/fnins.2018.00762/full\n\n"
 
-    "Mulert, C., et al. (2017). A serotonin transporter gene polymorphism and the effect of tryptophan "
-    "depletion on EEG synchronization. Biological Psychiatry. "
-    "https://pubmed.ncbi.nlm.nih.gov/28988534/\n\n"
+        "Mulert, C., et al. (2017). A serotonin transporter gene polymorphism and the effect of tryptophan "
+        "depletion on EEG synchronization. Biological Psychiatry. "
+        "https://pubmed.ncbi.nlm.nih.gov/28988534/\n\n"
 
-    "Neubauer, A. C., & Fink, A. (2009). Intelligence and neural efficiency. Brain and Cognition, 70(3), "
-    "277-284. https://doi.org/10.1016/j.bandc.2009.04.007\n\n"
+        "Neubauer, A. C., & Fink, A. (2009). Intelligence and neural efficiency. Brain and Cognition, 70(3), "
+        "277-284. https://doi.org/10.1016/j.bandc.2009.04.007\n\n"
 
-    "Onton, J., Delorme, A., & Makeig, S. (2005). Frontal midline EEG dynamics during working memory. "
-    "NeuroImage, 27(2), 341–356. https://doi.org/10.1016/j.neuroimage.2005.04.014\n\n"
+        "Onton, J., Delorme, A., & Makeig, S. (2005). Frontal midline EEG dynamics during working memory. "
+        "NeuroImage, 27(2), 341–356. https://doi.org/10.1016/j.neuroimage.2005.04.014\n\n"
 
-    "O'Reilly, R. C., & Frank, M. J. (2006). Making working memory work: A computational model of "
-    "cognitive control. Trends in Cognitive Sciences, 10(11), 502-508. "
-    "https://doi.org/10.1016/j.tics.2006.10.004\n\n"
+        "O'Reilly, R. C., & Frank, M. J. (2006). Making working memory work: A computational model of "
+        "cognitive control. Trends in Cognitive Sciences, 10(11), 502-508. "
+        "https://doi.org/10.1016/j.tics.2006.10.004\n\n"
 
-    "Pfurtscheller, G., & Neuper, C. (2001). Functional brain imaging based on ERD/ERS. "
-    "Electroencephalography and Clinical Neurophysiology, 110(5), 184-188. "
-    "https://doi.org/10.1016/S0013-4694(98)00057-5\n\n"
+        "Pfurtscheller, G., & Neuper, C. (2001). Functional brain imaging based on ERD/ERS. "
+        "Electroencephalography and Clinical Neurophysiology, 110(5), 184-188. "
+        "https://doi.org/10.1016/S0013-4694(98)00057-5\n\n"
 
-    "Rana, M., et al. (2021). Emotion Analysis for Personality Inference from EEG Signals. "
-    "Journal of Cognitive Neuroscience.\n\n"
+        "Rana, M., et al. (2021). Emotion Analysis for Personality Inference from EEG Signals. "
+        "Journal of Cognitive Neuroscience.\n\n"
 
-    "Roslan, N. S., Izhar, L. I., Faye, I., & Abdul Rahman, M. (2017). Review of EEG and ERP studies of "
-    "extraversion personality for baseline and cognitive tasks. Personality and Individual Differences, "
-    "119, 323–332. https://doi.org/10.1016/j.paid.2017.08.004\n\n"
+        "Roslan, N. S., Izhar, L. I., Faye, I., & Abdul Rahman, M. (2017). Review of EEG and ERP studies of "
+        "extraversion personality for baseline and cognitive tasks. Personality and Individual Differences, "
+        "119, 323–332. https://doi.org/10.1016/j.paid.2017.08.004\n\n"
 
-    "Roslan, N. S., Izhar, L. I., Faye, I., Amin, H. U., Mohamad Saad, M. N., Sivapalan, S., Abdul Karim, S. A., "
-    "& Abdul Rahman, M. (2019). Neural correlates of eye contact in face-to-face verbal interaction: "
-    "An EEG-based study of the extraversion personality trait. PLoS."
-    
-    "Sargent, J., et al. (2021). Frontal midline theta and gamma activity supports task control and "
-    "conscientiousness. Neuroscience & Biobehavioral Reviews, 124, 69–77. "
-    "https://www.sciencedirect.com/science/article/abs/pii/S0306453020305395\n\n"
+        "Roslan, N. S., Izhar, L. I., Faye, I., Amin, H. U., Mohamad Saad, M. N., Sivapalan, S., Abdul Karim, S. A., "
+        "& Abdul Rahman, M. (2019). Neural correlates of eye contact in face-to-face verbal interaction: "
+        "An EEG-based study of the extraversion personality trait. PLoS."
+        
+        "Sargent, J., et al. (2021). Frontal midline theta and gamma activity supports task control and "
+        "conscientiousness. Neuroscience & Biobehavioral Reviews, 124, 69–77. "
+        "https://www.sciencedirect.com/science/article/abs/pii/S0306453020305395\n\n"
 
-    "Salthouse, T. A. (1996). The processing-speed theory of adult age differences in cognition. "
-    "Psychological Review, 103(3), 403-428. https://doi.org/10.1037/0033-295X.103.3.403\n\n"
+        "Salthouse, T. A. (1996). The processing-speed theory of adult age differences in cognition. "
+        "Psychological Review, 103(3), 403-428. https://doi.org/10.1037/0033-295X.103.3.403\n\n"
 
-    "Sun, Y., et al. (2020). EEG-Based Personality Prediction Using Fast Fourier Transform and "
-    "DeepLSTM Model. Cognitive Science.\n\n"
+        "Sun, Y., et al. (2020). EEG-Based Personality Prediction Using Fast Fourier Transform and "
+        "DeepLSTM Model. Cognitive Science.\n\n"
 
-    "Tang, Y. Y., Ma, Y., Wang, J., Fan, Y., Feng, S., Lu, Q., ... & Posner, M. I. (2007). Short-term "
-    "meditation training improves attention and self-regulation. PNAS, 104(43), 17152–17156. "
-    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2276138/\n\n"
+        "Tang, Y. Y., Ma, Y., Wang, J., Fan, Y., Feng, S., Lu, Q., ... & Posner, M. I. (2007). Short-term "
+        "meditation training improves attention and self-regulation. PNAS, 104(43), 17152–17156. "
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2276138/\n\n"
 
-    "Thut, G., Pascual-Leone, A., & Kuhn, M. (2006). Studies of brain stimulation and cognitive "
-    "enhancement. NeuroImage, 31(1), 206-212. https://doi.org/10.1016/j.neuroimage.2005.12.054\n\n"
+        "Thut, G., Pascual-Leone, A., & Kuhn, M. (2006). Studies of brain stimulation and cognitive "
+        "enhancement. NeuroImage, 31(1), 206-212. https://doi.org/10.1016/j.neuroimage.2005.12.054\n\n"
 
-    "Tran, Y., Craig, A., & McIsaac, P. (2001). Extraversion/Introversion and 8–13 Hz wave in "
-    "frontal cortical regions. Personality and Individual Differences, 30(2), 205–215. "
-    "https://doi.org/10.1016/S0191-8869(00)00027-1\n\n"
+        "Tran, Y., Craig, A., & McIsaac, P. (2001). Extraversion/Introversion and 8–13 Hz wave in "
+        "frontal cortical regions. Personality and Individual Differences, 30(2), 205–215. "
+        "https://doi.org/10.1016/S0191-8869(00)00027-1\n\n"
 
-    "Verywell Mind. (2021). What Are Alpha Brain Waves? "
-    "https://www.verywellmind.com/what-are-alpha-brain-waves-5113721\n\n"
+        "Verywell Mind. (2021). What Are Alpha Brain Waves? "
+        "https://www.verywellmind.com/what-are-alpha-brain-waves-5113721\n\n"
 
-    "Vogel, E. K., McCollough, A. W., & Machizawa, M. G. (2005). Neural measures of individual "
-    "differences in working memory capacity. Cerebral Cortex, 15(6), 748-756. "
-    "https://doi.org/10.1093/cercor/bhh185\n\n"
+        "Vogel, E. K., McCollough, A. W., & Machizawa, M. G. (2005). Neural measures of individual "
+        "differences in working memory capacity. Cerebral Cortex, 15(6), 748-756. "
+        "https://doi.org/10.1093/cercor/bhh185\n\n"
 
-    "Wang, L., et al. (2020). Big Five Personality Traits Prediction Using Brain Signals. Brain and Cognition.\n\n"
+        "Wang, L., et al. (2020). Big Five Personality Traits Prediction Using Brain Signals. Brain and Cognition.\n\n"
 
-    "Wang, Y., et al. (2020). Decoding personality trait measures from resting EEG: An exploratory report. "
-    "Personality and Individual Differences, 163, 110054. "
-    "https://pubmed.ncbi.nlm.nih.gov/32653745/\n\n"
+        "Wang, Y., et al. (2020). Decoding personality trait measures from resting EEG: An exploratory report. "
+        "Personality and Individual Differences, 163, 110054. "
+        "https://pubmed.ncbi.nlm.nih.gov/32653745/\n\n"
 
-    "Wang, Y., Wang, Y., & Li, X. (2025). Extraversion and the Brain: A Coordinate-Based Meta-Analysis of "
-    "Functional Brain Imaging Studies on Positive Affect. Human Brain Mapping, 46(3), 789–802. "
-    "https://doi.org/10.1002/hbm.25345\n\n"
+        "Wang, Y., Wang, Y., & Li, X. (2025). Extraversion and the Brain: A Coordinate-Based Meta-Analysis of "
+        "Functional Brain Imaging Studies on Positive Affect. Human Brain Mapping, 46(3), 789–802. "
+        "https://doi.org/10.1002/hbm.25345\n\n"
 
-    "Wei, L., et al. (2011). Personality traits and the amplitude of spontaneous low-frequency oscillations "
-    "during resting state. Neuroscience Letters, 492(2), 109-113. "
-    "https://www.sciencedirect.com/science/article/abs/pii/S0304394011001133\n\n"
+        "Wei, L., et al. (2011). Personality traits and the amplitude of spontaneous low-frequency oscillations "
+        "during resting state. Neuroscience Letters, 492(2), 109-113. "
+        "https://www.sciencedirect.com/science/article/abs/pii/S0304394011001133\n\n"
 
-    "Yuan, F., et al. (2022). Personality Assessment Based on Electroencephalography Signals during Hazard Recognition. "
-    "Cognitive Neuroscience.\n\n"
+        "Yuan, F., et al. (2022). Personality Assessment Based on Electroencephalography Signals during Hazard Recognition. "
+        "Cognitive Neuroscience.\n\n"
 
-    "Zhang, Y., et al. (2021). EEG-Based Personality Prediction Using Fast Fourier Transform and DeepLSTM Model. "
-    "Neuroscience Letters.\n\n"
+        "Zhang, Y., et al. (2021). EEG-Based Personality Prediction Using Fast Fourier Transform and DeepLSTM Model. "
+        "Neuroscience Letters.\n\n"
 
-    "Zhang, W., Zhou, Y., Zhang, Y., & Zhan, X. (2024). Event-related potentials study on the effects of high neuroticism "
-    "on senile false memory. PLoS ONE, 19(8), e0304646. https://doi.org/10.1371/journal.pone.0304646\n\n"
+        "Zhang, W., Zhou, Y., Zhang, Y., & Zhan, X. (2024). Event-related potentials study on the effects of high neuroticism "
+        "on senile false memory. PLoS ONE, 19(8), e0304646. https://doi.org/10.1371/journal.pone.0304646\n\n"
 
-    "Zhu, X., et al. (2020). EEG responses to emotional videos can quantitatively predict big-five personality traits. "
-    "Frontiers in Human Neuroscience."
+        "Zhu, X., et al. (2020). EEG responses to emotional videos can quantitatively predict big-five personality traits. "
+        "Frontiers in Human Neuroscience."
     )
 
     disclaimer_text = (
@@ -832,14 +889,98 @@ if __name__ == "__main__":
         'hasil yang konsisten potensi EEG sebagai alat yang kuat dalam analisis psikologis.'
     )
 
-    halaman_1_cover(c, biodata, executive_summary_text, "topoplot1.png", "topoplot2.png", page_num=1)
-    halaman_2(c, behavior_traits_text,"topoplot1.png", judul_topoplot1,page_num=2)
+    # --------------------------------------------------------------------------
+    # D: PROSES UTAMA - GENERASI KONTEN DAN PEMBUATAN PDF
+    # --------------------------------------------------------------------------
+    print("Memulai proses pembuatan laporan...")
+
+    try:
+        with open("bank_data.txt", "r", encoding="utf-8") as f:
+            bank_data = f.read()
+        print("Data referensi (bank_data.txt) berhasil dimuat.")
+    except FileNotFoundError:
+        print("Error: file 'bank_data.txt' tidak ditemukan! Proses dihentikan.")
+        exit()
+
+    # Inisialisasi variabel untuk menampung hasil AI
+    executive_summary_formatted = "Konten Executive Summary gagal digenerate."
+    person_fit_job_formatted = "Konten Person-Job Fit gagal digenerate."
+
+    print("\n--- Memulai Generasi Konten AI ---")
+
+    # === LANGKAH 1: GENERATE EXECUTIVE SUMMARY ===
+    print("1. Menggenerate Executive Summary...")
+    keywords_for_summary = [TIPE_KEPRIBADIAN, KOGNITIF_UTAMA_KEY]
+    specific_context_es = extract_relevant_data(bank_data, keywords_for_summary)
+
+    prompt_es = PROMPT_TEMPLATES["executive_summary_narrative"].format(
+        specific_context=specific_context_es,
+        tipe_kepribadian=TIPE_KEPRIBADIAN,
+        pekerjaan=PEKERJAAN,
+        kognitif_utama=kognitif_utama_display_name
+    )
+    executive_summary_formatted = generate_ai_content(prompt_es, model=MODEL_AI, task_name="Executive Summary")
+
+    # --- KONVERSI MARKDOWN BOLD KE HTML (Versi Baru) ---
+    if "Error:" not in executive_summary_formatted:
+        # Menggunakan regular expression untuk mencari semua teks di antara **...**
+        # dan menggantinya dengan <b>...</b>.
+        executive_summary_formatted = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', executive_summary_formatted)
+        print("   -- Executive Summary berhasil digenerate dan format bold dikonversi.")
+    # ----------------------------------------------------
+    else:
+        print(f"   -- Gagal meng-generate Executive Summary. Respon: {executive_summary_formatted}")
+
+    # === LANGKAH 2: GENERATE PERSON-JOB FIT (DENGAN KONVERSI MARKDOWN KE HTML) ===
+    print("2. Menggenerate konten Person-Job Fit dalam format Markdown...")
+    prompt_job_fit = PROMPT_TEMPLATES["person_job_fit_full"].format(
+        tipe_kepribadian=TIPE_KEPRIBADIAN,
+        kognitif_utama=kognitif_utama_display_name
+    )
+    # AI akan menghasilkan teks dengan format Markdown
+    raw_markdown_text = generate_ai_content(prompt_job_fit, model=MODEL_AI, task_name="Person-Job Fit (Markdown)")
+
+    if "Error:" not in raw_markdown_text:
+        print("   -- Mengonversi format Markdown ke HTML...")
+        try:
+            # 1. Ubah **teks** menjadi <b>teks</b>
+            # Ini akan menangani semua judul pekerjaan
+            html_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', raw_markdown_text)
+            
+            # 2. Ubah spasi paragraf (dua baris baru) menjadi <br/><br/>
+            # Ini akan memberi jarak antar item
+            html_text = html_text.replace('\n\n', '<br/><br/>')
+            
+            # 3. (Opsional tapi aman) Ubah sisa baris baru tunggal menjadi spasi
+            # Ini untuk memastikan tidak ada jeda aneh di tengah kalimat
+            html_text = html_text.replace('\n', ' ')
+            
+            person_fit_job_formatted = html_text
+            print("   -- Format HTML untuk Person-Job Fit berhasil dibuat dari Markdown.")
+
+        except Exception as e:
+            person_fit_job_formatted = f"Error saat konversi Markdown: {e}<br/>Teks mentah: {raw_markdown_text}"
+            print(f"   -- Error saat konversi Markdown: {e}")
+    else:
+        person_fit_job_formatted = raw_markdown_text # Tampilkan pesan error dari AI
+        print(f"   -- Gagal meng-generate konten Person-Job Fit. Respon: {person_fit_job_formatted}")
+
+    # === LANGKAH 3: PEMBUATAN PDF ===
+    print(f"\n--- Memulai Pembuatan PDF: {NAMA_FILE_OUTPUT} ---")
+    c = canvas.Canvas(NAMA_FILE_OUTPUT, pagesize=A4)
+
+    # Memanggil fungsi untuk setiap halaman dengan penomoran yang benar
+    halaman_1_cover(c, biodata, executive_summary_formatted, page_num=1)
+    halaman_2(c, behavior_traits_text, "topoplot1.png", judul_topoplot1, page_num=2)
     halaman_3(c, behavior_traits_text_2, page_num=3)
     halaman_4(c, cognitive_traits_text, page_num=4)
-    halaman_5(c, behavior_traits_text_2, "topoplot2.png",judul_topoplot2, page_num=5)
-    halaman_6(c, person_fit_job, page_num=6)
-    halaman_7(c, person_fit_job, page_num=7)
-    halaman_8(c, referensi_text_1, page_num=8)
-    halaman_11(c, disclaimer_text, page_num=12)
+    halaman_5(c, cognitive_traits_text_2, "topoplot2.png", judul_topoplot2, page_num=5)
+    halaman_person_fit_job(c, person_fit_job_formatted, page_num=6)
+    # Halaman 7 kosong, langsung ke Referensi di halaman 8
+    # Fungsi halaman_8 akan mengurus penomoran selanjutnya jika referensi lebih dari 1 halaman
+    halaman_8(c, referensi_text_1, page_num=7) 
+    # Disclaimer ditempatkan di halaman terakhir, kita asumsikan halaman 12
+    halaman_11(c, disclaimer_text, page_num=12) 
+
     c.save()
-    print("PDF 'laporan_panjang.pdf' berhasil dibuat!")
+    print(f"\n✅ PDF '{NAMA_FILE_OUTPUT}' berhasil dibuat!")
