@@ -26,6 +26,7 @@ __pycache__/
 # Abaikan database lokal jika Anda menggunakan SQLite.
 *.db
 *.sqlite3
+*pdf
 
 # Abaikan folder untuk file upload sementara dan hasil analisis.
 # Repositori hanya perlu menyimpan kode, bukan data yang di-generate.
@@ -44,6 +45,5 @@ __pycache__/
 .idea/
 
 /output_files/
-
 *csv
 *edf

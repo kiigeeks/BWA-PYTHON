@@ -50,7 +50,7 @@ def extract_relevant_data(full_text, keywords):
             print(f"Peringatan: Keyword '{keyword}' tidak ditemukan di bank_data.txt")
     return "\n\n".join(extracted_chunks)
 
-def generate_ai_content(prompt, model="llama3", task_name="AI Task"):
+def generate_ai_content(prompt, model="llama3:8b", task_name="AI Task"):
     """
     Fungsi generik untuk berinteraksi dengan model AI Ollama.
     Versi ini memiliki pembersih otomatis untuk menghapus kalimat pembuka yang tidak diinginkan.
@@ -481,10 +481,10 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     # A: KONFIGURASI
     # --------------------------------------------------------------------------
-    TIPE_KEPRIBADIAN = "Conscientiousness"
-    KOGNITIF_UTAMA_KEY = "WCST (Logika)" 
+    TIPE_KEPRIBADIAN = "Openess"
+    KOGNITIF_UTAMA_KEY = "Digit Span (Short Term Memory)" 
     PEKERJAAN = "Supervisor dan Tax Accounting"
-    MODEL_AI = "llama3"
+    MODEL_AI = "llama3:8b"
     NAMA_FILE_OUTPUT = "laporan_profiling_lengkap.pdf"
     
     KOGNITIF_MAP = {
@@ -501,66 +501,61 @@ if __name__ == "__main__":
     # B: TEMPLATE PROMPT AI (Versi Final dengan Contoh/Few-Shot)
     PROMPT_TEMPLATES = {
         "executive_summary_narrative": """
-        Anda adalah seorang konsultan SDM profesional. Tugas Anda adalah menulis paragraf Executive Summary yang analitis dan padat.
+        Anda adalah seorang konsultan SDM profesional. Tugas Anda adalah menulis paragraf Executive Summary yang analitis, padat, dan profesional.
 
         ---
-        **CONTOH OUTPUT YANG DIINGINKAN:**
-
-        **Input Data Contoh:**
-        - Tipe Kepribadian Utama: Openness
-        - Kekuatan Kognitif Utama: Working Memory
-        - Posisi yang Dilamar: Creative Director
-
-        **Contoh Paragraf Summary:**
-        Individu ini menunjukkan profil kepribadian **Openness** yang kuat, ditandai dengan rasa ingin tahu yang tinggi, imajinasi, dan keterbukaan terhadap ide-ide baru. Didukung oleh kekuatan kognitif pada **Working Memory**, ia mampu mengelola banyak informasi secara bersamaan dan fleksibel dalam berpikir. Kombinasi ini menciptakan sinergi yang sangat baik untuk posisi **Creative Director**, di mana kemampuan untuk menghasilkan konsep-konsep inovatif (Openness) sambil mengelola detail proyek yang kompleks (Working Memory) adalah kunci. Potensi tantangan mungkin muncul dalam tugas-tugas yang sangat repetitif. Secara keseluruhan, profil ini dinilai **Sangat Cocok** untuk peran yang menuntut kreativitas dan pemikiran dinamis.
+        **CONTOH OUTPUT YANG DIINGINKAN (Gaya Penulisan):**
+        Individu ini menunjukkan profil kepribadian **Openness** yang kuat, ditandai dengan rasa ingin tahu yang tinggi dan keterbukaan terhadap ide baru. Didukung oleh kekuatan kognitif pada **Working Memory**, ia mampu mengelola banyak informasi secara bersamaan. Kombinasi ini menciptakan sinergi yang sangat baik untuk posisi **Creative Director**, di mana kemampuan menghasilkan konsep inovatif sambil mengelola detail proyek adalah kunci. Potensi tantangan mungkin muncul dalam tugas yang sangat repetitif. Secara keseluruhan, profil ini dinilai **Sangat Cocok** untuk peran yang menuntut kreativitas dan pemikiran dinamis.
         ---
 
         **SEKARANG, TUGAS ANDA:**
-        Buatlah Executive Summary untuk data di bawah ini. Tiru **GAYA PENULISAN, STRUKTUR, dan KUALITAS ANALISIS** dari contoh di atas.
+        Buatlah Executive Summary berdasarkan data di bawah ini. Tiru **GAYA PENULISAN, STRUKTUR, dan KUALITAS ANALISIS** dari contoh di atas.
 
-        **Data yang Harus Dianalisis:**
+        **Data untuk Dianalisis:**
         - Tipe Kepribadian Utama: {tipe_kepribadian}
         - Kekuatan Kognitif Utama: {kognitif_utama}
         - Posisi yang Dilamar: {pekerjaan}
         - Konteks Tambahan dari Tes: {specific_context}
 
-        **ATURAN MUTLAK**: Langsung tulis paragrafnya. Jangan sertakan pengantar atau pengulangan instruksi.
+        **ATURAN MUTLAK:**
+        1.  Fokus pada analisis psikologis dan kesesuaian kerja.
+        2.  **SINTESISKAN** ketiga data di atas (kepribadian, kognitif, pekerjaan) menjadi satu paragraf yang koheren.
+        3.  **JANGAN** menyebutkan detail teknis seperti 'gelombang EEG', 'kanal otak', 'aktivitas frontal', atau istilah teknis sejenisnya.
+        4.  Gunakan `**teks tebal**` untuk menyorot poin-poin kunci seperti nama trait, kekuatan kognitif, dan tingkat kesesuaian.
+        5.  Langsung tulis paragrafnya tanpa kalimat pembuka seperti "Berikut adalah...".
         """,
 
         "person_job_fit_full": """
-    Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja.
+        Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja yang cocok berdasarkan profil kandidat.
 
-    ==============================
-    CONTOH SEBAGAI REFERENSI GAYA DAN FORMAT:
-    (Perhatikan penggunaan **...** untuk judul dan baris kosong untuk spasi)
-    ==============================
-    Individu dengan kepribadian yang ramah dan energik, dikombinasikan dengan kekuatan kognitif yang efisien, cenderung unggul dalam lingkungan kerja yang dinamis dan kolaboratif. Mereka mampu berinteraksi dengan banyak orang sambil tetap mengingat detail-detail penting dari percakapan.
+        ==============================
+        **CONTOH SEBAGAI REFERENSI GAYA DAN FORMAT:**
+        (Ini hanyalah contoh format, jangan tiru kontennya jika tidak sesuai dengan profil)
+        ==============================
+        Individu dengan kepribadian yang ramah dan energik, dikombinasikan dengan kekuatan kognitif yang efisien, cenderung unggul dalam lingkungan kerja yang dinamis dan kolaboratif. Mereka mampu berinteraksi dengan banyak orang sambil tetap mengingat detail-detail penting.
 
-    **Manajer Penjualan (Sales Manager):** Peran ini membutuhkan kemampuan membangun relasi dan melacak banyak prospek serta target penjualan secara bersamaan.
+        **Manajer Penjualan (Sales Manager):** Peran ini membutuhkan kemampuan membangun relasi dan melacak banyak prospek serta target penjualan secara bersamaan.
 
-    **Event Organizer:** Kemampuan untuk berkoordinasi dengan banyak vendor dan peserta sambil mengelola jadwal dan logistik yang rumit membuat peran ini sangat cocok.
+        **Event Organizer:** Kemampuan untuk berkoordinasi dengan banyak vendor dan peserta sambil mengelola jadwal dan logistik yang rumit membuat peran ini sangat cocok.
+        ==============================
+        **AKHIR DARI CONTOH**
+        ==============================
 
-    **Public Relations Specialist:** Berinteraksi dengan media dan publik secara efektif sambil mengingat poin-poin pesan utama dan data pendukung adalah inti dari pekerjaan ini.
+        **SEKARANG, TUGAS ANDA:**
+        Buatlah analisis rekomendasi pekerjaan untuk profil di bawah ini. Analisis **HARUS** spesifik dan relevan dengan kombinasi sifat dan kekuatan yang diberikan.
 
-    Secara keseluruhan, individu dengan profil ini sangat cocok untuk peran yang berorientasi pada manusia, serba cepat, dan membutuhkan kemampuan multitasking yang tinggi dalam komunikasi.
-    ==============================
-    AKHIR DARI CONTOH
-    ==============================
+        **PROFIL UNTUK DIANALISIS:**
+        - Kepribadian Dominan: {tipe_kepribadian}
+        - Kekuatan Kognitif: {kognitif_utama}
 
-    SEKARANG, TUGAS ANDA:
-    Buatlah analisis untuk profil di bawah ini. Ikuti **PERSIS** format Markdown dan kualitas penjelasan dari contoh di atas.
-
-    PROFIL UNTUK DIANALISIS:
-    - Kepribadian Dominan: {tipe_kepribadian}
-    - Kekuatan Kognitif: {kognitif_utama}
-
-    ATURAN MUTLAK:
-    - Gunakan Bahasa Indonesia.
-    - Gunakan `**Judul Pekerjaan:**` untuk membuat teks tebal.
-    - Gunakan **satu baris kosong** untuk membuat spasi antar paragraf atau antar item pekerjaan.
-    - JANGAN gunakan tag HTML (`<b>`, `<br/>`).
-    - Langsung mulai dengan paragraf pembuka tanpa pengantar apa pun.
-    """
+        **ATURAN MUTLAK:**
+        - Gunakan Bahasa Indonesia yang profesional.
+        - Format jawaban persis seperti contoh: paragraf pembuka, diikuti daftar pekerjaan.
+        - Gunakan `**Judul Pekerjaan:**` untuk membuat judul pekerjaan tebal.
+        - Gunakan satu baris kosong untuk spasi antar item.
+        - JANGAN gunakan tag HTML.
+        - Langsung mulai dengan paragraf pembuka tanpa pengantar.
+        """
     }
     # --------------------------------------------------------------------------
     # C: KONTEN STATIS UNTUK LAPORAN
@@ -941,29 +936,26 @@ if __name__ == "__main__":
     raw_markdown_text = generate_ai_content(prompt_job_fit, model=MODEL_AI, task_name="Person-Job Fit (Markdown)")
 
     if "Error:" not in raw_markdown_text:
-        print("   -- Mengonversi format Markdown ke HTML...")
+        print("   -- Mengonversi format Markdown ke HTML untuk PDF...")
         try:
-            # 1. Ubah **teks** menjadi <b>teks</b>
-            # Ini akan menangani semua judul pekerjaan
+            # 1. Ubah **teks tebal** menjadi <b>teks tebal</b>
             html_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', raw_markdown_text)
             
-            # 2. Ubah spasi paragraf (dua baris baru) menjadi <br/><br/>
-            # Ini akan memberi jarak antar item
-            html_text = html_text.replace('\n\n', '<br/><br/>')
+            # 2. Pisahkan teks menjadi paragraf/bagian berdasarkan baris kosong
+            parts = html_text.strip().split('\n\n')
             
-            # 3. (Opsional tapi aman) Ubah sisa baris baru tunggal menjadi spasi
-            # Ini untuk memastikan tidak ada jeda aneh di tengah kalimat
-            html_text = html_text.replace('\n', ' ')
+            # 3. Gabungkan kembali dengan tag <br/><br/>
+            # Ini lebih aman daripada .replace() karena menangani spasi/newline yang tidak konsisten
+            person_fit_job_formatted = '<br/><br/>'.join(part.replace('\n', ' ') for part in parts)
             
-            person_fit_job_formatted = html_text
-            print("   -- Format HTML untuk Person-Job Fit berhasil dibuat dari Markdown.")
-
+            print("   -- Format HTML untuk Person-Job Fit berhasil dibuat.")
         except Exception as e:
             person_fit_job_formatted = f"Error saat konversi Markdown: {e}<br/>Teks mentah: {raw_markdown_text}"
             print(f"   -- Error saat konversi Markdown: {e}")
     else:
-        person_fit_job_formatted = raw_markdown_text # Tampilkan pesan error dari AI
+        person_fit_job_formatted = raw_markdown_text
         print(f"   -- Gagal meng-generate konten Person-Job Fit. Respon: {person_fit_job_formatted}")
+
 
     # === LANGKAH 3: PEMBUATAN PDF ===
     print(f"\n--- Memulai Pembuatan PDF: {NAMA_FILE_OUTPUT} ---")
