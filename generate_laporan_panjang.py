@@ -50,7 +50,7 @@ def extract_relevant_data(full_text, keywords):
             print(f"Peringatan: Keyword '{keyword}' tidak ditemukan di bank_data.txt")
     return "\n\n".join(extracted_chunks)
 
-def generate_ai_content(prompt, model="llama3:8b", task_name="AI Task"):
+def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
     """
     Fungsi generik untuk berinteraksi dengan model AI Ollama.
     Versi ini memiliki pembersih otomatis untuk menghapus kalimat pembuka yang tidak diinginkan.
@@ -189,6 +189,8 @@ def halaman_1_cover(c, biodata, executive_summary_text, page_num):
     c.setFont("Times-Bold", 12)
     c.drawString(60, y, "EXECUTIVE SUMMARY")
     y -= 15
+    c.setFont("Times-Roman", 12)
+
 
     style = ParagraphStyle(
         name="JustifySmall", fontName="Times-Roman", fontSize=12,
@@ -481,18 +483,13 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     # A: KONFIGURASI
     # --------------------------------------------------------------------------
-    TIPE_KEPRIBADIAN = "Openess"
+    TIPE_KEPRIBADIAN = "Agreeableness"
     KOGNITIF_UTAMA_KEY = "Digit Span (Short Term Memory)" 
-    PEKERJAAN = "Supervisor dan Tax Accounting"
-    MODEL_AI = "llama3:8b"
+    PEKERJAAN = "Tax Accountant"
+    MODEL_AI = "llama3.1:8b"
     NAMA_FILE_OUTPUT = "laporan_profiling_lengkap.pdf"
     
-    KOGNITIF_MAP = {
-        "Kraepelin Test (Numerik)": "Working Memory",
-        "WCST (Logika)": "Pemikiran Logis",
-        "Digit Span (Short Term Memory)": "Memori Jangka Pendek"
-    }
-    kognitif_utama_display_name = KOGNITIF_MAP.get(KOGNITIF_UTAMA_KEY, KOGNITIF_UTAMA_KEY)
+    kognitif_utama_display_name = KOGNITIF_UTAMA_KEY
 
     # --------------------------------------------------------------------------
     # B: TEMPLATE PROMPT AI
@@ -500,62 +497,161 @@ if __name__ == "__main__":
 
     # B: TEMPLATE PROMPT AI (Versi Final dengan Contoh/Few-Shot)
     PROMPT_TEMPLATES = {
-        "executive_summary_narrative": """
-        Anda adalah seorang konsultan SDM profesional. Tugas Anda adalah menulis paragraf Executive Summary yang analitis, padat, dan profesional.
+        # "executive_summary_narrative": """
+        # Anda adalah seorang ahli psikologi industri dan organisasi (PIO). Tugas Anda adalah meniru GAYA ANALISIS dan FORMAT OUTPUT dari contoh di bawah untuk menghasilkan sebuah executive summary.
 
+        # ======================================
+        # CONTOH KASUS & OUTPUT IDEAL (TIRU GAYA INI)
+        # ======================================
+        # --- CONTOH INPUT DATA ---
+        # - Tipe Kepribadian Utama: Conscientiousness (Kekuatan: Teliti, teratur. Kelemahan: Kaku)
+        # - Kekuatan Kognitif Utama: Logika WCST (Kekuatan: Penalaran abstrak)
+        # - Posisi yang Dilamar: Software Tester
+
+        # --- CONTOH HASIL AKHIR PARAGRAF (INI ADALAH FORMAT OUTPUT YANG SAYA INGINKAN) ---
+        # Individu ini dinilai **Cocok** untuk posisi Software Tester. Kekuatan utamanya yang didorong oleh sifat **Conscientiousness** yang tinggi membuatnya memiliki **ketelitian dan keteraturan** yang sangat selaras dengan tuntutan inti untuk menemukan anomali perangkat lunak. Kemampuan **logika abstraknya** juga mendukung dalam merancang skenario pengujian yang efektif. Meskipun demikian, terdapat area pengembangan minor pada aspek **kecenderungan untuk bersikap kaku**, yang perlu diperhatikan saat menghadapi perubahan prioritas pengujian yang dinamis. Dengan pembinaan untuk meningkatkan fleksibilitas, individu ini berpotensi menjadi Software Tester yang andal.
+        
+        # ======================================
+        # TUGAS AKHIR & ATURAN MUTLAK
+        # ======================================
+        
+        # **TUGAS ANDA:**
+        # SEKARANG, ANALISIS DATA DI BAWAH INI. TIRU GAYA DAN FORMAT DARI CONTOH DI ATAS UNTUK MENGHASILKAN **SATU PARAGRAF** EXECUTIVE SUMMARY FINAL.
+
+        # **DATA UNTUK DIANALISIS:**
+        # - Tipe Kepribadian Utama: {tipe_kepribadian}
+        # - Kekuatan Kognitif Utama: {kognitif_utama}
+        # - Posisi yang Dilamar: {pekerjaan}
+        # - Konteks Tambahan dari Tes: {specific_context}
+
+        # **ATURAN PALING UTAMA:**
+        # OUTPUT ANDA **HANYA BOLEH** TERDIRI DARI SATU PARAGRAF ANALISIS FINAL. JANGAN MENULIS APAPUN SELAIN PARAGRAF TERSEBUT.
+        # """,
+        # PROMPT BARU - LANGKAH 1
+        "prompt_step1_deep_analysis_and_score": """
+        Anda adalah seorang ahli psikologi industri dan organisasi (PIO) senior.
+        
+        TUGAS: Lakukan analisis MENTAH yang sangat detail dalam format poin-poin. JANGAN MENULIS PARAGRAF. Di akhir, berikan penilaian skor mentah dari 1 (sangat tidak cocok) hingga 10 (sangat cocok) beserta justifikasinya.
+        
+        PROFIL KANDIDAT:
+        - Kepribadian: {tipe_kepribadian}
+        - Kognitif: {kognitif_utama}
+        - Konteks Tambahan: {specific_context}
+        
+        POSISI YANG DITUJU:
+        - Jabatan: {pekerjaan}
+        
+        FORMAT OUTPUT WAJIB:
+        1.  **Sinergi Positif:** Jelaskan bagaimana {tipe_kepribadian} dan {kognitif_utama} saling mendukung untuk peran {pekerjaan}.
+        2.  **Potensi Konflik/Risiko:** Jelaskan potensi benturan antara profil kandidat dengan tuntutan peran.
+        3.  **Rekomendasi Aksi:** Saran pengembangan yang konkret.
+        4.  **Penilaian Skor Mentah (1-10):** [Tuliskan skor di sini]
+        5.  **Justifikasi Skor:** [Jelaskan secara singkat mengapa Anda memberikan skor tersebut, dengan mempertimbangkan keseimbangan sinergi vs risiko]
+        """,
+
+        # LANGKAH 2: PENENTUAN LABEL KECOCOKAN
+        "prompt_step2_determine_level": """
+        Anda adalah seorang quality control analyst.
+        
+        TUGAS: Berdasarkan analisis dan skor di bawah, pilih SATU label yang paling sesuai dari tiga opsi berikut: "Sangat Cocok", "Cocok dengan Catatan Pengembangan", "Kurang Cocok".
+        
+        PANDUAN PEMILIHAN LABEL:
+        - Skor 8-10: Pilih "Sangat Cocok"
+        - Skor 5-7: Pilih "Cocok dengan Catatan Pengembangan"
+        - Skor 1-4: Pilih "Kurang Cocok"
+        
+        ANALISIS UNTUK DIEVALUASI:
         ---
-        **CONTOH OUTPUT YANG DIINGINKAN (Gaya Penulisan):**
-        Individu ini menunjukkan profil kepribadian **Openness** yang kuat, ditandai dengan rasa ingin tahu yang tinggi dan keterbukaan terhadap ide baru. Didukung oleh kekuatan kognitif pada **Working Memory**, ia mampu mengelola banyak informasi secara bersamaan. Kombinasi ini menciptakan sinergi yang sangat baik untuk posisi **Creative Director**, di mana kemampuan menghasilkan konsep inovatif sambil mengelola detail proyek adalah kunci. Potensi tantangan mungkin muncul dalam tugas yang sangat repetitif. Secara keseluruhan, profil ini dinilai **Sangat Cocok** untuk peran yang menuntut kreativitas dan pemikiran dinamis.
+        {deep_analysis_and_score}
         ---
+        
+        ATURAN: Output Anda HANYA berupa salah satu dari tiga label tersebut. Jangan menulis apa pun lagi.
+        """,
 
-        **SEKARANG, TUGAS ANDA:**
-        Buatlah Executive Summary berdasarkan data di bawah ini. Tiru **GAYA PENULISAN, STRUKTUR, dan KUALITAS ANALISIS** dari contoh di atas.
+        # LANGKAH 3: PENULISAN NARASI FINAL
+        "prompt_step3_write_narrative": """
+        Anda adalah seorang penulis laporan psikologi industri senior yang ahli dalam menyusun analisis yang mendalam dan actionable.
 
-        **Data untuk Dianalisis:**
-        - Tipe Kepribadian Utama: {tipe_kepribadian}
-        - Kekuatan Kognitif Utama: {kognitif_utama}
-        - Posisi yang Dilamar: {pekerjaan}
-        - Konteks Tambahan dari Tes: {specific_context}
+        TUGAS: Tulis **DUA PARAGRAF** executive summary yang komprehensif dan profesional berdasarkan analisis mentah dan label kecocokan yang sudah ditentukan.
 
-        **ATURAN MUTLAK:**
-        1.  Fokus pada analisis psikologis dan kesesuaian kerja.
-        2.  **SINTESISKAN** ketiga data di atas (kepribadian, kognitif, pekerjaan) menjadi satu paragraf yang koheren.
-        3.  **JANGAN** menyebutkan detail teknis seperti 'gelombang EEG', 'kanal otak', 'aktivitas frontal', atau istilah teknis sejenisnya.
-        4.  Gunakan `**teks tebal**` untuk menyorot poin-poin kunci seperti nama trait, kekuatan kognitif, dan tingkat kesesuaian.
-        5.  Langsung tulis paragrafnya tanpa kalimat pembuka seperti "Berikut adalah...".
+        ======================================
+        DATA UNTUK DITULIS:
+        - Label Kecocokan yang Telah Ditentukan: "{determined_level}"
+        - Analisis Mentah Lengkap:
+        ---
+        {deep_analysis_and_score}
+        ---
+        ======================================
+
+        INSTRUKSI PENULISAN WAJIB:
+
+        **Paragraf 1: FOKUS PADA DIAGNOSIS KECOCOKAN**
+        1.  Awali dengan menyatakan level kecocokan yang telah ditentukan (Contoh: "Berdasarkan analisis profil, individu ini dinilai **{determined_level}** untuk posisi...").
+        2.  Jelaskan **kekuatan utama** (sinergi positif) yang mendukung penilaian tersebut. Kaitkan langsung dengan tugas-tugas spesifik pada posisi yang dilamar.
+        3.  Jelaskan secara **detail dan eksplisit mengenai Potensi Konflik/Risiko**. Uraikan MENGAPA kelemahan tersebut menjadi masalah signifikan untuk peran ini. Jangan hanya menyebutkan kelemahannya, tetapi jelaskan **dampaknya** pada performa kerja.
+
+        **Paragraf 2: FOKUS PADA RENCANA PENGEMBANGAN**
+        1.  Awali dengan kalimat transisi yang jelas (Contoh: "Untuk memaksimalkan potensi dan memitigasi risiko tersebut...").
+        2.  Berikan **rekomendasi pengembangan yang konkret dan dapat ditindaklanjuti (actionable)** berdasarkan poin "Rekomendasi Aksi" dari analisis mentah.
+        3.  Jelaskan bagaimana rekomendasi tersebut dapat membantu individu mengatasi kelemahan yang dibahas di paragraf pertama.
+        4.  Akhiri dengan kalimat penutup yang optimis namun realistis mengenai potensi kandidat jika pengembangan dilakukan.
+
+        **ATURAN TAMBAHAN:**
+        - Gunakan format bold `**teks**` untuk menyorot istilah-istilah kunci.
+        - Jangan sebutkan "skor" atau "nilai" numerik dalam narasi.
+        - Pastikan alur antar paragraf logis dan mengalir.
+        - OUTPUT HARUS TEPAT DUA PARAGRAF.
         """,
 
         "person_job_fit_full": """
-        Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja yang cocok berdasarkan profil kandidat.
+        Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja yang cocok berdasarkan profil kandidat dengan format yang spesifik dan terstruktur.
 
         ==============================
-        **CONTOH SEBAGAI REFERENSI GAYA DAN FORMAT:**
-        (Ini hanyalah contoh format, jangan tiru kontennya jika tidak sesuai dengan profil)
+        **TEMPLATE FORMAT YANG HARUS DIIKUTI PERSIS:**
         ==============================
-        Individu dengan kepribadian yang ramah dan energik, dikombinasikan dengan kekuatan kognitif yang efisien, cenderung unggul dalam lingkungan kerja yang dinamis dan kolaboratif. Mereka mampu berinteraksi dengan banyak orang sambil tetap mengingat detail-detail penting.
-
-        **Manajer Penjualan (Sales Manager):** Peran ini membutuhkan kemampuan membangun relasi dan melacak banyak prospek serta target penjualan secara bersamaan.
-
-        **Event Organizer:** Kemampuan untuk berkoordinasi dengan banyak vendor dan peserta sambil mengelola jadwal dan logistik yang rumit membuat peran ini sangat cocok.
-        ==============================
-        **AKHIR DARI CONTOH**
-        ==============================
+        
+        Individu dengan kepribadian [KEPRIBADIAN] dan kemampuan [KOGNITIF] akan optimal dalam pekerjaan yang membutuhkan [sebutkan karakteristik kerja yang spesifik sesuai profil]. Berikut adalah beberapa bidang kerja yang sesuai:
+        
+        **[Nama Kategori Bidang 1]**
+        [Job Title 1], [Job Title 2], [Job Title 3]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        
+        **[Nama Kategori Bidang 2]**  
+        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        
+        **[Nama Kategori Bidang 3]**
+        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        
+        **[Nama Kategori Bidang 4]**
+        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        
+        **[Nama Kategori Bidang 5]**
+        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
 
         **SEKARANG, TUGAS ANDA:**
-        Buatlah analisis rekomendasi pekerjaan untuk profil di bawah ini. Analisis **HARUS** spesifik dan relevan dengan kombinasi sifat dan kekuatan yang diberikan.
+        Buatlah analisis rekomendasi pekerjaan untuk profil di bawah ini menggunakan format template di atas SECARA PERSIS.
 
         **PROFIL UNTUK DIANALISIS:**
         - Kepribadian Dominan: {tipe_kepribadian}
         - Kekuatan Kognitif: {kognitif_utama}
 
         **ATURAN MUTLAK:**
-        - Gunakan Bahasa Indonesia yang profesional.
-        - Format jawaban persis seperti contoh: paragraf pembuka, diikuti daftar pekerjaan.
-        - Gunakan `**Judul Pekerjaan:**` untuk membuat judul pekerjaan tebal.
-        - Gunakan satu baris kosong untuk spasi antar item.
-        - JANGAN gunakan tag HTML.
-        - Langsung mulai dengan paragraf pembuka tanpa pengantar.
-        """
+        1. **PARAGRAF PEMBUKA**: Ikuti pola "Individu dengan kepribadian X dan kemampuan Y akan optimal dalam pekerjaan yang membutuhkan..."
+        2. **KALIMAT TRANSISI**: Selalu gunakan "Berikut adalah beberapa bidang kerja yang sesuai:"
+        3. **FORMAT KATEGORI**: 
+        - Gunakan **Nama Kategori** (contoh: **Sales & Account Management**, **Customer Service & Client Relations**)
+        - Daftar 2-3 job titles dipisah koma, diakhiri titik
+        - Langsung lanjut dengan penjelasan dalam 1 paragraf (2-3 kalimat)
+        4. **BERIKAN 5 KATEGORI** bidang kerja yang berbeda dan spesifik
+        5. **PENJELASAN SETIAP KATEGORI HARUS**:
+        - Menjelaskan mengapa cocok dengan profil
+        - Menyebutkan bagaimana kepribadian digunakan
+        - Menyebutkan bagaimana kemampuan kognitif dimanfaatkan
+        - Memberikan contoh tugas atau situasi kerja spesifik
+        6. **BAHASA**: Gunakan Bahasa Indonesia yang profesional dan formal
+        7. **JANGAN** gunakan bullet points, numbering, atau tag HTML
+        8. **KONSISTENSI**: Ikuti format template tanpa variasi apapun
+        9. **SPESIFIK**: Semua rekomendasi harus logis dan relevan dengan kombinasi kepribadian + kognitif yang diberikan
+     """
     }
     # --------------------------------------------------------------------------
     # C: KONTEN STATIS UNTUK LAPORAN
@@ -903,34 +999,60 @@ if __name__ == "__main__":
 
     print("\n--- Memulai Generasi Konten AI ---")
 
-    # === LANGKAH 1: GENERATE EXECUTIVE SUMMARY ===
-    print("1. Menggenerate Executive Summary...")
+    # === LANGKAH 1: GENERATE EXECUTIVE SUMMARY (METODE 3 LANGKAH OTOMATIS) ===
+    print("1. Memulai proses 3 langkah untuk Executive Summary Otomatis...")
+
+    # -- Langkah 1: Analisis Mendalam & Penilaian Skor --
+    print("   -> Langkah 1: Meminta AI melakukan analisis & skoring...")
     keywords_for_summary = [TIPE_KEPRIBADIAN, KOGNITIF_UTAMA_KEY]
     specific_context_es = extract_relevant_data(bank_data, keywords_for_summary)
 
-    prompt_es = PROMPT_TEMPLATES["executive_summary_narrative"].format(
+    prompt_step1 = PROMPT_TEMPLATES["prompt_step1_deep_analysis_and_score"].format(
         specific_context=specific_context_es,
         tipe_kepribadian=TIPE_KEPRIBADIAN,
         pekerjaan=PEKERJAAN,
         kognitif_utama=kognitif_utama_display_name
     )
-    executive_summary_formatted = generate_ai_content(prompt_es, model=MODEL_AI, task_name="Executive Summary")
+    deep_analysis_output = generate_ai_content(prompt_step1, model=MODEL_AI, task_name="ES - Analisis & Skor")
 
-    # --- KONVERSI MARKDOWN BOLD KE HTML (Versi Baru) ---
-    if "Error:" not in executive_summary_formatted:
-        # Menggunakan regular expression untuk mencari semua teks di antara **...**
-        # dan menggantinya dengan <b>...</b>.
-        executive_summary_formatted = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', executive_summary_formatted)
-        print("   -- Executive Summary berhasil digenerate dan format bold dikonversi.")
-    # ----------------------------------------------------
+    executive_summary_formatted = "Konten Executive Summary gagal digenerate."
+
+    if "Error:" not in deep_analysis_output:
+        # -- Langkah 2: Penentuan Level Kecocokan --
+        print("   -> Langkah 2: Meminta AI menentukan level kecocokan...")
+        prompt_step2 = PROMPT_TEMPLATES["prompt_step2_determine_level"].format(
+            deep_analysis_and_score=deep_analysis_output
+        )
+        determined_level = generate_ai_content(prompt_step2, model=MODEL_AI, task_name="ES - Penentuan Level").strip()
+
+        if "Error:" not in determined_level and determined_level:
+            # -- Langkah 3: Penulisan Narasi Final --
+            print(f"   -> Langkah 3: AI menentukan level: '{determined_level}'. Meminta penulisan narasi...")
+            prompt_step3 = PROMPT_TEMPLATES["prompt_step3_write_narrative"].format(
+                determined_level=determined_level,
+                deep_analysis_and_score=deep_analysis_output
+            )
+            executive_summary_formatted = generate_ai_content(prompt_step3, model=MODEL_AI, task_name="ES - Penulisan Narasi")
+
+            if "Error:" not in executive_summary_formatted:
+                # Konversi Markdown ke HTML
+                # Gunakan .replace() untuk mengganti teks literal. Jauh lebih aman dan sederhana.
+                executive_summary_formatted = executive_summary_formatted.replace('**Executive Summary**', '').strip()                  
+                executive_summary_formatted = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', executive_summary_formatted)
+                print("   -- Executive Summary otomatis yang detail berhasil dibuat.")
+            else:
+                print(f"   -- Gagal pada langkah penulisan narasi. Respon: {executive_summary_formatted}")
+        else:
+            print(f"   -- Gagal pada langkah penentuan level. Respon: {determined_level}")
     else:
-        print(f"   -- Gagal meng-generate Executive Summary. Respon: {executive_summary_formatted}")
+        print(f"   -- Gagal pada langkah analisis awal. Respon: {deep_analysis_output}")
 
     # === LANGKAH 2: GENERATE PERSON-JOB FIT (DENGAN KONVERSI MARKDOWN KE HTML) ===
     print("2. Menggenerate konten Person-Job Fit dalam format Markdown...")
     prompt_job_fit = PROMPT_TEMPLATES["person_job_fit_full"].format(
         tipe_kepribadian=TIPE_KEPRIBADIAN,
-        kognitif_utama=kognitif_utama_display_name
+        kognitif_utama=kognitif_utama_display_name,
+        specific_context=specific_context_es
     )
     # AI akan menghasilkan teks dengan format Markdown
     raw_markdown_text = generate_ai_content(prompt_job_fit, model=MODEL_AI, task_name="Person-Job Fit (Markdown)")
@@ -941,12 +1063,8 @@ if __name__ == "__main__":
             # 1. Ubah **teks tebal** menjadi <b>teks tebal</b>
             html_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', raw_markdown_text)
             
-            # 2. Pisahkan teks menjadi paragraf/bagian berdasarkan baris kosong
-            parts = html_text.strip().split('\n\n')
-            
-            # 3. Gabungkan kembali dengan tag <br/><br/>
-            # Ini lebih aman daripada .replace() karena menangani spasi/newline yang tidak konsisten
-            person_fit_job_formatted = '<br/><br/>'.join(part.replace('\n', ' ') for part in parts)
+            # 2. Ganti setiap baris baru dengan tag <br/> agar menjadi daftar
+            person_fit_job_formatted = html_text.replace('\n', '<br/>')
             
             print("   -- Format HTML untuk Person-Job Fit berhasil dibuat.")
         except Exception as e:
