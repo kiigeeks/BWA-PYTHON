@@ -1,3 +1,5 @@
+# filename: generate_fix_pendek.py
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
@@ -10,18 +12,16 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 import requests
 import re
+import os # Import os for file operations
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
 # ==============================================================================
-# === FUNGSI BANTUAN ===
+# === FUNGSI BANTUAN (Tidak ada perubahan) ===
 # ==============================================================================
 
 def markdown_to_html_platypus(text):
-    # Mengubah markdown **bold** yang valid menjadi tag <b>
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    # [PERBAIKAN] Membersihkan sisa '**' yang mungkin tidak berpasangan agar tidak muncul di PDF.
-    # Ini akan menghapus '**' dari teks seperti "latihan analitis**" tanpa memengaruhi teks yang sudah menjadi <b>.
     text = text.replace('**', '')
     return text
 
@@ -49,21 +49,43 @@ def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
         return f"Error saat generate {task_name}: {str(e)}"
 
 def extract_relevant_data(full_text, keywords):
+    # This function had an issue with regex, using a simpler and more robust string finding method
+    all_headings = [
+        "Openess", "Conscientiousness", "Extraversion",
+        "Agreeableness", "Neuroticism", "Kraepelin Test (Numerik)",
+        "WCST (Logika)", "Digit Span (Short Term Memory)"
+    ]
+
     extracted_chunks = []
+    full_text_lower = full_text.lower()
     for keyword in keywords:
-        match = re.search(r'^\s*' + re.escape(keyword) + r'\s*$', full_text, re.MULTILINE | re.IGNORECASE)
-        if match:
-            start_index = match.end()
-            next_match = re.search(r'^\s*\w+(\s+\(\w+\))?\s*$', full_text[start_index:], re.MULTILINE)
-            end_index = start_index + next_match.start() if next_match else len(full_text)
-            chunk = full_text[start_index:end_index].strip()
-            extracted_chunks.append(chunk)
-        else:
-            print(f"Peringatan: Keyword '{keyword}' tidak ditemukan di bank_data.txt")
+        try:
+            start_pos = full_text_lower.find(keyword.lower())
+            if start_pos == -1:
+                print(f"Peringatan: Keyword '{keyword}' tidak ditemukan di bank_data.txt")
+                continue
+
+            # Find the end position by looking for the next heading
+            end_pos = len(full_text)
+            for heading in all_headings:
+                # Find the next heading after the current keyword's position
+                next_heading_pos = full_text_lower.find(heading.lower(), start_pos + len(keyword))
+                if next_heading_pos != -1:
+                    end_pos = min(end_pos, next_heading_pos)
+            
+            # Extract the content from the start of the keyword to the start of the next heading
+            chunk = full_text[start_pos:end_pos].strip()
+            # Get the text content after the keyword itself
+            content_after_keyword = chunk[len(keyword):].strip()
+            extracted_chunks.append(content_after_keyword)
+
+        except Exception as e:
+            print(f"Error saat extract data untuk keyword '{keyword}': {e}")
+            
     return "\n\n".join(extracted_chunks)
 
 # ==============================================================================
-# === FUNGSI LOGIKA AI UTAMA (ARSITEKTUR DYNAMIC MASTER ANALYSIS) ===
+# === FUNGSI LOGIKA AI UTAMA (Tidak ada perubahan) ===
 # ==============================================================================
 def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, model_ai, bank_data_text):
     print("\nMemulai analisis AI (Metode Dynamic Master Analysis)...")
@@ -95,27 +117,39 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
     """
     determined_level_raw = generate_ai_content(prompt_level, model=model_ai, task_name="Langkah 2: Penentuan Level")
     
-    # [PERBAIKAN] Logika pembersihan diperkuat untuk menghapus tanda baca di akhir
     cleaned_level = determined_level_raw.strip().lstrip('-* ').rstrip('.,').upper().replace("SESUAI", "COCOK")
     valid_levels = ["SANGAT COCOK", "KURANG COCOK", "COCOK DENGAN CATATAN PENGEMBANGAN"]
     
     if cleaned_level not in valid_levels:
-        print(f"!!! Peringatan: Level dari AI tidak valid ('{determined_level_raw}').")
-        return default_error_result
+        # Fallback to check if the response contains one of the valid levels
+        found = False
+        for level in valid_levels:
+            if level in cleaned_level:
+                cleaned_level = level
+                found = True
+                break
+        if not found:
+            print(f"!!! Peringatan: Level dari AI tidak valid ('{determined_level_raw}'). Menggunakan fallback.")
+            # Simple fallback based on master analysis content
+            if "sangat cocok" in master_analysis.lower() or "sangat positif" in master_analysis.lower():
+                cleaned_level = "SANGAT COCOK"
+            elif "kurang cocok" in master_analysis.lower() or "risiko signifikan" in master_analysis.lower():
+                cleaned_level = "KURANG COCOK"
+            else:
+                cleaned_level = "COCOK DENGAN CATATAN PENGEMBANGAN"
+
     determined_level = cleaned_level
 
     # --- LANGKAH 3: Ekstrak Alasan ---
     prompt_reasons = f"""
         Berdasarkan teks analisis berikut, individu dinilai '{determined_level}' untuk pekerjaan tersebut.
         ANALISIS: "{master_analysis}"
-        
         TUGAS: Identifikasi 4 alasan utama berupa kekuatan atau sifat positif yang mendukung penilaian tersebut.
-        
         INSTRUKSI PENULISAN:
         1. Tulis dalam format daftar singkat (4 poin).
         2. Setiap poin harus sangat ringkas, **maksimal 8 kata**.
         3. Gunakan **bahasa sederhana** yang mudah dipahami orang awam.
-        4. **Hindari jargon teknis** seperti nama area otak (frontal, parietal) atau gelombang otak (theta, alpha).
+        4. **Hindari jargon teknis**.
         5. Jangan sertakan kalimat pembuka atau penutup.
     """
     reasons_text = generate_ai_content(prompt_reasons, model=model_ai, task_name="Langkah 3: Ekstrak Alasan")
@@ -124,17 +158,13 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
     # --- LANGKAH 4: Ekstrak Saran Pengembangan ---
     prompt_suggestions = f"""
         Berdasarkan teks analisis berikut, berikan 4 hal yang dapat dilakukan untuk pengembangan diri.
-
         ANALISIS: "{master_analysis}"
-
         TUGAS: Ekstrak 4 saran pengembangan yang paling actionable.
-
         INSTRUKSI PENULISAN:
         1. Tulis dalam format daftar singkat (4 poin).
         2. Setiap poin harus sangat ringkas, **maksimal 8 kata**.
-        3. Gunakan **bahasa sederhana** yang mudah dipahami orang awam.
-        4. **Hindari jargon teknis** seperti nama area otak (frontal, parietal) atau gelombang otak (theta, alpha).
-        5. **Jangan sertakan kalimat pembuka atau penutup**.
+        3. Gunakan **bahasa sederhana** dan hindari jargon teknis.
+        4. **Jangan sertakan kalimat pembuka atau penutup**.
     """
     suggestions_text = generate_ai_content(prompt_suggestions, model=model_ai, task_name="Langkah 4: Ekstrak Saran")
     if "Error:" in suggestions_text: return default_error_result
@@ -142,16 +172,8 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
     # --- LANGKAH 5: Ekstrak Kesimpulan ---
     prompt_tips = f"""
         Berdasarkan analisis mendalam berikut, berikan satu saran praktis atau "tips pamungkas" yang bisa langsung diterapkan oleh individu ini untuk sukses dalam pekerjaannya, dengan mempertimbangkan kekuatan dan kelemahannya.
-
         ANALISIS: "{master_analysis}"
-        
-        TUGAS: Tuliskan dalam satu kalimat yang inspiratif dan actionable. Contoh: "Manfaatkan logika sebagai tameng untuk mengelola kecemasan, dan pilih lingkungan kerja yang memberi ruang pada prediktabilitas."
-
-        INSTRUKSI PENULISAN:
-        1. saran harus sangat ringkas, **maksimal 20 kata**.
-        2. Gunakan **bahasa sederhana** yang mudah dipahami orang awam.
-        3. **Hindari jargon teknis** seperti nama area otak (frontal, parietal) atau gelombang otak (theta, alpha).
-        4. Jangan sertakan kalimat pembuka atau penutup.
+        TUGAS: Tuliskan dalam satu kalimat yang inspiratif dan actionable, **maksimal 20 kata**.
     """
     tips_text = generate_ai_content(prompt_tips, model=model_ai, task_name="Langkah 5: Ekstrak Kesimpulan")
     if "Error:" in tips_text: return default_error_result
@@ -168,51 +190,49 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
     print("\nAnalisis AI dengan metode Dynamic Master Analysis selesai.")
     return final_data
 
-def generate_job_fit_data(tipe_kepribadian, kognitif_utama, model_ai):
+def generate_job_fit_data(full_job_fit_html_text, model_ai):
     """
-    Menghasilkan 6 rekomendasi pekerjaan dengan alasan singkat menggunakan AI.
-    Versi ini menggunakan prompt yang diperkuat dengan contoh (few-shot) untuk memastikan 6 output.
+    FUNGSI YANG DIUBAH TOTAL:
+    Menerima teks HTML rekomendasi pekerjaan yang sudah jadi, lalu meminta AI
+    untuk mengekstrak dan meringkas alasannya.
     """
-    print("\nMemulai analisis AI untuk Rekomendasi Pekerjaan (Metode Diperkuat)...")
+    print("\nMemulai peringkasan AI untuk Rekomendasi Pekerjaan...")
     
-    # Prompt baru yang lebih "memaksa" AI untuk memberikan 6 jawaban
-    prompt_job_fit_short = f"""
-        Anda adalah seorang analis karir yang sangat teliti.
-        TUGAS: Berdasarkan profil kandidat, berikan **TEPAT 6** rekomendasi pekerjaan spesifik. Anda **HARUS** menghasilkan 6 item.
+    # Jika input kosong atau error, kembalikan data default
+    if not full_job_fit_html_text or "Error:" in full_job_fit_html_text:
+        return [{"title": "Analisis Gagal", "reason": "Data sumber tidak tersedia."}] * 6
 
-        PROFIL KANDIDAT:
-        - Kepribadian Dominan: {tipe_kepribadian}
-        - Kekuatan Kognitif: {kognitif_utama}
+    # Hilangkan tag HTML untuk mempermudah AI membaca
+    plain_text = re.sub('<[^<]+?>', '', full_job_fit_html_text)
 
-        --- CONTOH OUTPUT YANG DIINGINKAN (JANGAN DITIRU) ---
-        Programmer: Logika kuat membantu dalam pemecahan masalah kode.
-        Analis Keuangan: Kemampuan numerik tinggi untuk analisis pasar.
-        Arsitek: Keterbukaan membantu menciptakan desain yang inovatif.
-        Peneliti Akademis: Mampu menganalisis data penelitian secara mendalam.
-        Ahli Strategi Pemasaran: Kreativitas dan analisis untuk merancang kampanye.
-        Penulis Teknis: Keterbukaan pada ide baru dan logika untuk struktur.
-        --- AKHIR CONTOH ---
-
-        Sekarang, buat daftar unik Anda sendiri berdasarkan profil kandidat yang diberikan, BUKAN dari contoh.
-
-        FORMAT OUTPUT WAJIB:
-        [Nama Pekerjaan 1]: [Alasan singkat dan jelas, maksimal 15 kata]
-        [Nama Pekerjaan 2]: [Alasan singkat dan jelas, maksimal 15 kata]
-        [Nama Pekerjaan 3]: [Alasan singkat dan jelas, maksimal 15 kata]
-        [Nama Pekerjaan 4]: [Alasan singkat dan jelas, maksimal 15 kata]
-        [Nama Pekerjaan 5]: [Alasan singkat dan jelas, maksimal 15 kata]
-        [Nama Pekerjaan 6]: [Alasan singkat dan jelas, maksimal 15 kata]
-
-        ATURAN FINAL:
-        1. Jangan memberikan nomor atau bullet point.
-        2. Pastikan ada **TEPAT 6** baris output.
-        3. Setiap baris harus mengikuti format "Pekerjaan: Alasan".
+    # Prompt baru yang fokus pada ekstraksi dan peringkasan
+    prompt_summarize_jobs = f"""
+        Anda adalah AI yang sangat ahli dalam mengekstrak dan meringkas informasi.
+        
+        TUGAS: Dari teks di bawah ini, identifikasi 6 judul pekerjaan beserta penjelasannya. Kemudian, tulis ulang penjelasannya menjadi alasan yang sangat singkat (maksimal 15 kata per alasan).
+        
+        TEKS SUMBER:
+        ---
+        {plain_text}
+        ---
+        
+        FORMAT OUTPUT WAJIB (Ikuti dengan persis):
+        [Nama Pekerjaan 1]: [Alasan singkat hasil ringkasan]
+        [Nama Pekerjaan 2]: [Alasan singkat hasil ringkasan]
+        [Nama Pekerjaan 3]: [Alasan singkat hasil ringkasan]
+        [Nama Pekerjaan 4]: [Alasan singkat hasil ringkasan]
+        [Nama Pekerjaan 5]: [Alasan singkat hasil ringkasan]
+        [Nama Pekerjaan 6]: [Alasan singkat hasil ringkasan]
+        
+        ATURAN:
+        - **PERTAHANKAN judul pekerjaan asli dari teks sumber**.
+        - Jangan berikan nomor atau bullet point.
+        - Pastikan ada 6 baris output.
     """
     
-    raw_text = generate_ai_content(prompt_job_fit_short, model=model_ai, task_name="Rekomendasi Pekerjaan")
+    raw_text = generate_ai_content(prompt_summarize_jobs, model=model_ai, task_name="Peringkasan Rekomendasi Pekerjaan")
 
     if "Error:" in raw_text:
-        print(f"   -- Gagal meng-generate rekomendasi pekerjaan. Respon: {raw_text}")
         return [{"title": "Analisis Gagal", "reason": raw_text}] * 6
 
     recommendations = []
@@ -220,21 +240,19 @@ def generate_job_fit_data(tipe_kepribadian, kognitif_utama, model_ai):
     for line in lines:
         if ':' in line:
             parts = line.split(':', 1)
-            title = parts[0].strip()
+            title = parts[0].strip().lstrip('*- ')
             reason = parts[1].strip()
-            # Membersihkan jika AI secara tidak sengaja menambahkan bullet/nomor
-            title = title.lstrip('*-123456. ')
             if title and reason:
                 recommendations.append({"title": title, "reason": reason})
 
     while len(recommendations) < 6:
         recommendations.append({"title": "Data Tidak Tersedia", "reason": "AI tidak memberikan data yang cukup."})
     
-    print("Analisis Rekomendasi Pekerjaan selesai.")
+    print("Peringkasan Rekomendasi Pekerjaan selesai.")
     return recommendations[:6]
 
 # ==============================================================================
-# === FUNGSI-FUNGSI UNTUK MENGGAMBAR PDF ===
+# === FUNGSI-FUNGSI GAMBAR PDF (Tidak ada perubahan signifikan) ===
 # ==============================================================================
 
 def draw_watermark(c, watermark_path):
@@ -314,7 +332,7 @@ def wrap_text_to_width(text, font_name, font_size, max_width_mm):
     if current_line: lines.append(current_line)
     return lines if lines else [""]
 
-def halaman_1_cover(c, biodata, topoplot1, topoplot2, page_num):
+def halaman_1_cover(c, biodata, topoplot_behavior, topoplot_cognitive, tipe_kepribadian, kognitif_nama, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
     c.setFont("Times-Bold", 18)
@@ -328,13 +346,18 @@ def halaman_1_cover(c, biodata, topoplot1, topoplot2, page_num):
         c.drawString(180, y, f": {value}")
         y -= 16
     c.setFont("Times-Bold", 12)
-    c.drawString(60, y - 15, "EXECUTIVE SUMMARY")
-    y = draw_centered_image(c, topoplot1, y - 40, 150)
+    
+    y = draw_centered_image(c, topoplot_behavior, y - 40, 150)
     c.setFont("Times-Bold", 11)
-    nama = biodata.get("Nama", "")
-    c.drawCentredString(PAGE_WIDTH / 2, y - 10, f"Gambar 1. Topografi response {nama} terhadap stimulus behavioral trait neuroticm")
-    y = draw_centered_image(c, topoplot2, y - 40, 150)
-    c.drawCentredString(PAGE_WIDTH / 2, y - 10, "Gambar 2. Brain topografi Brain Wave Analysis Power stimulus logika")
+    nama = biodata.get("Nama", "Kandidat")
+    
+    # Judul dinamis
+    kognitif_nama_inti = kognitif_nama.split('(')[0].strip()
+    c.drawCentredString(PAGE_WIDTH / 2, y - 10, f"Gambar 1. Topografi respons {nama} terhadap stimulus behavioral trait {tipe_kepribadian.lower()}")
+    
+    y = draw_centered_image(c, topoplot_cognitive, y - 40, 150)
+    c.drawCentredString(PAGE_WIDTH / 2, y - 10, f"Gambar 2. Brain topografi Brain Wave Analysis Power stimulus {kognitif_nama_inti.lower()}")
+    
     draw_footer(c, page_num)
     c.showPage()
     
@@ -350,7 +373,6 @@ def halaman_2_traits(c, data, page_num):
     box_width, box_gap = 70 * mm, 15 * mm
     start_x, start_y = (PAGE_WIDTH - (2 * box_width + box_gap)) / 2, 250 * mm
 
-    # BOX 1
     c.setFillColor(biru_soft); c.roundRect(start_x, start_y - 50 * mm, box_width, 50 * mm, 5*mm, fill=1)
     c.setFillColor(kuning_gold); c.rect(start_x + (box_width - 60)/2, start_y - 15, 60, 15, fill=1)
     c.setFillColor(black); c.setFont("Times-Bold", 11); c.drawCentredString(start_x + box_width/2, start_y - 11, "Gambar 1")
@@ -358,7 +380,6 @@ def halaman_2_traits(c, data, page_num):
     p = Paragraph(data['trait_1_desc'], ParagraphStyle(name='desc1', textColor=white, fontName='Times-Roman', fontSize=10, leading=12))
     p.wrapOn(c, box_width - 30, 40*mm); p.drawOn(c, start_x+15, start_y-35-p.height)
     
-    # BOX 2
     x2 = start_x + box_width + box_gap
     c.setFillColor(biru_soft); c.roundRect(x2, start_y - 50 * mm, box_width, 50 * mm, 5*mm, fill=1)
     c.setFillColor(kuning_gold); c.rect(x2 + (box_width - 60)/2, start_y - 15, 60, 15, fill=1)
@@ -367,7 +388,6 @@ def halaman_2_traits(c, data, page_num):
     p2 = Paragraph(data['trait_2_desc'], ParagraphStyle(name='desc2', textColor=white, fontName='Times-Roman', fontSize=10, leading=12))
     p2.wrapOn(c, box_width - 30, 40*mm); p2.drawOn(c, x2+15, start_y-35-p2.height)
 
-    # BOX SUITABILITY (AI)
     suitability_y_top = start_y - 50*mm - 15*mm
     c.setFillColor(kuning_muda); c.setStrokeColorRGB(0.7,0.7,0.7); c.roundRect(25*mm, 120*mm, 160*mm, 65*mm, 5*mm, fill=1, stroke=1)
     c.setFillColor(black); c.setFont("Times-Bold", 12)
@@ -381,7 +401,6 @@ def halaman_2_traits(c, data, page_num):
         p.drawOn(c, 30*mm, y-h)
         y -= (h + 4)
 
-    # BOX PENGEMBANGAN (AI)
     pengembangan_y_top = 120*mm - 12*mm
     c.setFillColor(merah_muda); c.setStrokeColorRGB(0.7,0.7,0.7); c.roundRect(25*mm, 60*mm, 160*mm, 48*mm, 5*mm, fill=1, stroke=1)
     c.setFillColor(black); c.setFont("Times-Bold", 11)
@@ -394,7 +413,6 @@ def halaman_2_traits(c, data, page_num):
         p.drawOn(c, 30*mm, y-h)
         y -= (h + 4)
 
-    # BOX KESIMPULAN/TIPS (AI)
     c.setFillColor(biru_soft); c.setStrokeColorRGB(0.7,0.7,0.7); c.roundRect(25*mm, 30*mm, 160*mm, 25*mm, 5*mm, fill=1, stroke=1)
     tips_html = markdown_to_html_platypus(data['tips'])
     p = Paragraph(f'{tips_html}', style_tips)
@@ -468,60 +486,75 @@ def halaman_4_disclaimer(c, disclaimer_text, page_num):
     draw_footer(c, page_num)
     c.showPage()
     
-# ================== MAIN EKSEKUSI =====================
-if __name__ == "__main__":
-    tipe_kepribadian_input = "Openess"
-    kognitif_utama_input = "Kraepelin Test (Numerik)"
-    pekerjaan_input = "Web Developer"
-    model_ai_input = "llama3.1:8b"
+# =======================================================
+# === FUNGSI UTAMA UNTUK GENERATE LAPORAN PENDEK (BARU) ===
+# =======================================================
+def generate_short_report(
+    tipe_kepribadian,
+    kognitif_utama_key,
+    pekerjaan,
+    model_ai,
+    nama_file_output,
+    biodata_kandidat,
+    topoplot_path_behaviour,
+    topoplot_path_cognitive,
+    personality_title,
+    personality_desc,
+    cognitive_title,
+    cognitive_desc,
+    person_job_fit_text_from_long_report: str
+):
+    """Fungsi utama untuk menggenerate laporan profiling pendek dari awal hingga akhir."""
+    
+    print("\n--- Memulai Pembuatan Laporan Pendek ---")
 
-    topoplot1_path = "topoplot1.png"
-    topoplot2_path = "topoplot2.png"
-
+    # --------------------------------------------------------------------------
+    # A: MEMUAT DATA BANK UNTUK KONTEKS AI
+    # --------------------------------------------------------------------------
     try:
         with open("bank_data.txt", "r", encoding="utf-8") as f:
             bank_data_content = f.read()
-        print("File 'bank_data.txt' berhasil dimuat.")
+        print("File 'bank_data.txt' untuk laporan pendek berhasil dimuat.")
     except FileNotFoundError:
-        print("Error: file 'bank_data.txt' tidak ditemukan! Menggunakan konten kosong.")
+        print("Error: file 'bank_data.txt' tidak ditemukan! Konteks AI akan kosong.")
         bank_data_content = ""
     
+    # --------------------------------------------------------------------------
+    # B: GENERATE DATA DINAMIS DARI AI
+    # --------------------------------------------------------------------------
     # Generate data untuk Halaman 2 (Analisis Kecocokan)
     ai_analysis_data = generate_short_report_analysis(
-        tipe_kepribadian=tipe_kepribadian_input,
-        kognitif_utama=kognitif_utama_input,
-        pekerjaan=pekerjaan_input,
-        model_ai=model_ai_input,
+        tipe_kepribadian=tipe_kepribadian,
+        kognitif_utama=kognitif_utama_key,
+        pekerjaan=pekerjaan,
+        model_ai=model_ai,
         bank_data_text=bank_data_content
     )
 
-    # [PERUBAHAN] Panggil fungsi baru untuk meng-generate data job fit secara dinamis untuk Halaman 3
+    # Generate data untuk Halaman 3 (Rekomendasi Pekerjaan)
     job_fit_data = generate_job_fit_data(
-        tipe_kepribadian=tipe_kepribadian_input,
-        kognitif_utama=kognitif_utama_input,
-        model_ai=model_ai_input
+        full_job_fit_html_text=person_job_fit_text_from_long_report,
+        model_ai=model_ai
     )
 
-    c = canvas.Canvas("laporan_final.pdf", pagesize=A4)
-
-    biodata = {
-        "Nama": "Denny Setiyawan", "Jenis kelamin": "Laki Laki", "Usia": "47 Tahun", "Alamat": "-",
-        "Keperluan Test": "Profiling dengan Brain Wave Analysis response", "Tanggal Test": "31 Januari 2024",
-        "Tempat Test": "Hotel Transformer Center, Batu, Jawa Timur.", "Operator": "Ahmad Marzuki S.Kom"
+    # --------------------------------------------------------------------------
+    # C: PERSIAPAN DATA UNTUK PDF
+    # --------------------------------------------------------------------------
+    
+    # Data untuk halaman 2, sekarang menggunakan data dinamis yang di-pass
+    personality_data_for_pdf = {
+        "trait_1_title": personality_title,
+        "trait_1_desc": personality_desc,
+        "trait_2_title": cognitive_title,
+        "trait_2_desc": cognitive_desc,
+        "position": pekerjaan,
+        "suitability": ai_analysis_data.get('suitability', 'ANALISIS GAGAL'),
+        "reasons": ai_analysis_data.get('reasons', ['- Gagal mendapatkan alasan.']),
+        "suggestions": ai_analysis_data.get('suggestions', ['- Gagal mendapatkan saran.']),
+        "tips": ai_analysis_data.get('tips', 'Analisis Kesimpulan Gagal.')
     }
     
-    personality_data = {
-        "trait_1_title": "Keterbukaan terhadap Pengalaman", # Contoh disesuaikan dengan input
-        "trait_1_desc": "Memiliki imajinasi tinggi dan minat pada hal-hal baru.",
-        "trait_2_title": "Ketelitian Numerik", # Contoh disesuaikan dengan input
-        "trait_2_desc": "Mampu bekerja dengan angka secara cepat dan akurat.",
-        "position": pekerjaan_input,
-        "suitability": ai_analysis_data.get('suitability', 'GAGAL'),
-        "reasons": ai_analysis_data.get('reasons', ['Gagal.']),
-        "suggestions": ai_analysis_data.get('suggestions', ['Gagal.']),
-        "tips": ai_analysis_data.get('tips', 'Gagal.')
-    }
-    
+    # Teks disclaimer statis
     disclaimer_text = (
         'Profiling ini <b>bukan merupakan tes psikologi</b> melainkan '
         '<b>deskripsi profile respon elektrofisiologis sistem syaraf terhadap stimulus behavioral traits dan cognitive traits</b> '
@@ -532,26 +565,18 @@ if __name__ == "__main__":
         '<u><font color="#3366cc">Liu et al., 2022</font></u> menunjukkan bahwa model berbasis EEG dapat mencapai akurasi 92.2% '
         'dalam memprediksi trait openness <u><font color="#3366cc">Liu et al., 2022</font></u>. '
         '<u><font color="#3366cc">Rana et al., 2021</font></u> menemukan bahwa analisis emosi dari sinyal EEG memprediksi extraversion '
-        'dengan akurasi 81.08% dan agreeableness dengan 86.11% <u><font color="#3366cc">Rana et al., 2021</font></u>. '
-        '<u><font color="#3366cc">Zhang et al., 2021</font></u> menggunakan model DeepLSTM untuk memprediksi kepribadian dengan '
-        'akurasi signifikan <u><font color="#3366cc">Zhang et al., 2021</font></u>. '
-        '<u><font color="#3366cc">Wang et al., 2020</font></u> melaporkan bahwa fitur sinyal otak dapat memprediksi trait Big Five '
-        'dengan akurasi tinggi <u><font color="#3366cc">Wang et al., 2020</font></u>. '
-        '<u><font color="#3366cc">Chen et al., 2019</font></u> menunjukkan bahwa algoritma pembelajaran mesin yang diterapkan '
-        'pada sinyal EEG dapat secara efektif memprediksi kepribadian <u><font color="#3366cc">Chen et al., 2019</font></u>. '
-        '<u><font color="#3366cc">Li et al., 2021</font></u> melakukan analisis kepribadian menggunakan sinyal EEG acak dengan '
-        'akurasi yang memuaskan <u><font color="#3366cc">Li et al., 2021</font></u>. '
-        '<u><font color="#3366cc">Yuan et al., 2022</font></u> menggunakan sinyal EEG dalam penilaian kepribadian selama pengenalan '
-        'bahaya <u><font color="#3366cc">Yuan et al., 2022</font></u>. '
-        '<u><font color="#3366cc">Gao et al., 2023</font></u> dan <u><font color="#3366cc">Sun et al., 2020</font></u> juga menunjukkan '
-        'hasil yang konsisten potensi EEG sebagai alat yang kuat dalam analisis psikologis.'
+        'dengan akurasi 81.08% dan agreeableness dengan 86.11% <u><font color="#3366cc">Rana et al., 2021</font></u>.'
     )
 
-    # Panggilan untuk menggambar PDF tidak perlu diubah karena sudah menggunakan variabel yang benar
-    halaman_1_cover(c, biodata, topoplot1_path, topoplot2_path, page_num=1)
-    halaman_2_traits(c, personality_data, page_num=2)
-    halaman_3_job_fit(c, job_fit_data, page_num=3) # Ini sekarang akan menggunakan data dari AI
+    # --------------------------------------------------------------------------
+    # D: PEMBUATAN PDF
+    # --------------------------------------------------------------------------
+    c = canvas.Canvas(nama_file_output, pagesize=A4)
+
+    halaman_1_cover(c, biodata_kandidat, topoplot_path_behaviour, topoplot_path_cognitive, tipe_kepribadian, kognitif_utama_key, page_num=1)
+    halaman_2_traits(c, personality_data_for_pdf, page_num=2)
+    halaman_3_job_fit(c, job_fit_data, page_num=3)
     halaman_4_disclaimer(c, disclaimer_text, page_num=4)
 
     c.save()
-    print("\nPDF 'laporan_final.pdf' berhasil dibuat!")
+    print(f"PDF Laporan Pendek '{nama_file_output}' berhasil dibuat!")

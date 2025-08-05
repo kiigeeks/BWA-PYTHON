@@ -19,6 +19,7 @@ from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePa
 from tools import convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from config import settings
 from generate_fix import generate_full_report
+from generate_fix_pendek import generate_short_report
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -110,7 +111,7 @@ async def analyze_edf(
         print("Starting full analysis on processed CSV...")
         result = run_full_analysis(processed_csv_path, new_user.id, username)
         
-        # --- PEMBUATAN LAPORAN ---
+        # --- PEMBUATAN LAPORAN PANJANG ---
         print("\n--- Memulai integrasi pembuatan Laporan Panjang (PDF) ---")
         try:
             ALLOWED_PERSONALITIES = {"Openess", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"}
@@ -120,6 +121,13 @@ async def analyze_edf(
                 "KRAEPELIN TEST": "Kraepelin Test (Numerik)",
                 "WCST": "WCST (Logika)",
                 "DIGIT SPAN": "Digit Span (Short Term Memory)"
+            }
+            
+            # Mapping untuk mengambil nama pendek kognitif untuk query DB
+            cognitive_db_name_map = {
+                "KRAEPELIN TEST": "Kraepelin",
+                "WCST": "WCST",
+                "DIGIT SPAN": "Digit Span"
             }
 
             big_five_results = result['big_five']
@@ -160,32 +168,74 @@ async def analyze_edf(
                 
                 output_dir = "static/long_report"
                 os.makedirs(output_dir, exist_ok=True)
-                nama_file_output = f"{output_dir}/{new_user.username}_long_report.pdf"
+                nama_file_output_panjang = f"{output_dir}/{new_user.username}_long_report.pdf"
                 
-                print(f"   -> Memanggil generate_full_report untuk membuat file: {nama_file_output}")
-                generate_full_report(
+                print(f"   -> Memanggil generate_full_report untuk membuat file: {nama_file_output_panjang}")
+                person_job_fit_text = generate_full_report(
                     tipe_kepribadian=tipe_kepribadian_tertinggi,
                     kognitif_utama_key=kognitif_utama_key,
                     pekerjaan=pekerjaan,
                     model_ai="llama3.1:8b",
-                    nama_file_output=nama_file_output,
+                    nama_file_output=nama_file_output_panjang,
                     biodata_kandidat=biodata_kandidat,
                     topoplot_path_behaviour=topoplot_path_behavior,
                     topoplot_path_cognitive=topoplot_path_cognitive
                 )
                 
-                print(f"   -> Menyimpan path laporan ke database...")
                 user_to_update = db.query(models.User).filter(models.User.id == new_user.id).first()
                 if user_to_update:
-                    user_to_update.laporan_panjang = nama_file_output
+                    user_to_update.laporan_panjang = nama_file_output_panjang
                     db.commit()
-                    print("   -> Path berhasil disimpan.")
-                else:
-                    print("   -> Peringatan: Gagal menemukan user untuk update path laporan.")
-                result['long_report_url'] = f"{settings.BASE_URL}/{nama_file_output}"
-                print(f"   -> URL Laporan ditambahkan ke payload: {result['long_report_url']}")
+                result['long_report_url'] = f"{settings.BASE_URL}/{nama_file_output_panjang}"
+
+                # --- PERUBAHAN 2: BLOK LOGIKA BARU UNTUK LAPORAN PENDEK ---
+                print("\n--- Memulai integrasi pembuatan Laporan Pendek (PDF) ---")
+                try:
+                    # Ambil detail (title & desc) dari DB untuk laporan pendek
+                    personality_details = db.query(models.Personality).filter(models.Personality.name == tipe_kepribadian_tertinggi).first()
+                    
+                    cognitive_db_name = cognitive_db_name_map.get(kognitif_nama_tertinggi.upper())
+                    cognitive_details = db.query(models.Test).filter(models.Test.name == cognitive_db_name).first()
+
+                    if not personality_details or not cognitive_details:
+                        print("   -> Peringatan: Gagal mendapatkan detail kepribadian/kognitif dari DB. Laporan pendek dilewati.")
+                    else:
+                        output_dir_pendek = "static/short_report"
+                        os.makedirs(output_dir_pendek, exist_ok=True)
+                        nama_file_output_pendek = f"{output_dir_pendek}/{new_user.username}_short_report.pdf"
+
+                        print(f"   -> Memanggil generate_short_report untuk membuat file: {nama_file_output_pendek}")
+                        generate_short_report(
+                            tipe_kepribadian=tipe_kepribadian_tertinggi,
+                            kognitif_utama_key=kognitif_utama_key,
+                            pekerjaan=pekerjaan,
+                            model_ai="llama3.1:8b",
+                            nama_file_output=nama_file_output_pendek,
+                            biodata_kandidat=biodata_kandidat,
+                            topoplot_path_behaviour=topoplot_path_behavior,
+                            topoplot_path_cognitive=topoplot_path_cognitive,
+                            personality_title=personality_details.title,
+                            personality_desc=personality_details.description,
+                            cognitive_title=cognitive_details.title,
+                            cognitive_desc=cognitive_details.description,
+                            person_job_fit_text_from_long_report=person_job_fit_text
+                        )
+                        
+                        if user_to_update:
+                            user_to_update.laporan_pendek = nama_file_output_pendek
+                            db.commit()
+                            print("   -> Path laporan pendek berhasil disimpan.")
+                        
+                        result['short_report_url'] = f"{settings.BASE_URL}/{nama_file_output_pendek}"
+                        print(f"   -> URL Laporan pendek ditambahkan ke payload: {result['short_report_url']}")
+
+                except Exception as short_report_error:
+                    print(f"   -> !!! Terjadi error saat membuat laporan PDF pendek: {short_report_error}")
+                # --- AKHIR BLOK LAPORAN PENDEK ---
+                
         except Exception as report_error:
             print(f"   -> !!! Terjadi error saat membuat laporan PDF: {report_error}")
+            
         return StandardResponse(message="Analisis dari file EDF berhasil dan data client baru telah disimpan.", payload=result)
         
     except Exception as e:
@@ -194,7 +244,6 @@ async def analyze_edf(
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
         
     finally:
-        # --- CLEANUP ---
         if os.path.exists(temp_edf_path):
             os.remove(temp_edf_path)
         if os.path.exists(processed_csv_path):
