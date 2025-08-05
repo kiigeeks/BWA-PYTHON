@@ -1,15 +1,9 @@
-# models.py (Versi Terbaru)
-
-# Import komponen yang dibutuhkan dari sqlalchemy
 from sqlalchemy import (
     Column, Integer, String, Text, Enum, Date, Float, 
     ForeignKey
 )
 from sqlalchemy.orm import relationship
-
-# PERUBAHAN UTAMA: Impor 'Base' dari file database.py kita, bukan membuatnya di sini.
 from database import Base, engine
-
 
 # ==============================================================================
 #  1. TABEL UTAMA (CENTRAl TABLE)
@@ -37,16 +31,14 @@ class User(Base):
     report = Column(String(255), nullable=True)
     jobs = Column(String(255), nullable=True)
     note_jobs = Column(String(255), nullable=True)
+    laporan_panjang = Column(String(255), nullable=True)
+    laporan_pendek = Column(String(255), nullable=True)
 
-    # --- RELASI ONE-TO-MANY ---
     personalities_data = relationship("UserPersonality", back_populates="user", cascade="all, delete-orphan")
     personality_accuracies = relationship("UserPersonalityAccuracy", back_populates="user", cascade="all, delete-orphan")
     cognitive_data = relationship("UserCognitive", back_populates="user", cascade="all, delete-orphan")
     split_brain_data = relationship("UserSplitBrain", back_populates="user", cascade="all, delete-orphan")
     response_data = relationship("UserResponse", back_populates="user", cascade="all, delete-orphan")
-    fit_jobs = relationship("FitJob", back_populates="user", cascade="all, delete-orphan")
-    develops = relationship("Develop", back_populates="user", cascade="all, delete-orphan")
-    privileges = relationship("Privilege", back_populates="user", cascade="all, delete-orphan")
     roc_curves = relationship("ROCCurve", back_populates="user", cascade="all, delete-orphan")
 
 # ==============================================================================
@@ -54,38 +46,28 @@ class User(Base):
 # ==============================================================================
 
 class Personality(Base):
-    """Tabel master untuk jenis-jenis kepribadian (mis: Openness, etc)."""
     __tablename__ = "personalities"
-    
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
     title = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     explanation = Column(Text, nullable=True)
-    
     user_personalities = relationship("UserPersonality", back_populates="personality")
     user_accuracy_data = relationship("UserPersonalityAccuracy", back_populates="personality")
 
 class Test(Base):
-    """Tabel master untuk jenis-jenis tes kognitif (mis: Kraeplin, WSCT)."""
     __tablename__ = "tests"
-    
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
     title = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
-
     user_cognitive_data = relationship("UserCognitive", back_populates="test")
     user_split_brain_data = relationship("UserSplitBrain", back_populates="test")
 
 class Stimulation(Base):
-    """Tabel master untuk jenis-jenis stimulasi (mis: Open Eyes, Closed Eyes)."""
     __tablename__ = "stimulations"
-    
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
-    # --- KOLOM title_graph DIHAPUS ---
-
     user_response_data = relationship("UserResponse", back_populates="stimulation")
 
 # ==============================================================================
@@ -93,19 +75,15 @@ class Stimulation(Base):
 # ==============================================================================
 
 class UserPersonality(Base):
-    """Menyimpan skor hasil tes kepribadian untuk seorang user."""
     __tablename__ = "user_personalities"
-    
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     personality_id = Column(Integer, ForeignKey("personalities.id"), nullable=False)
-    
     engagement = Column(Float, nullable=True)
     excitement = Column(Float, nullable=True)
     interest = Column(Float, nullable=True)
     score = Column(Float, nullable=True)
     brain_topography = Column(String(255), nullable=True)
-    
     user = relationship("User", back_populates="personalities_data")
     personality = relationship("Personality", back_populates="user_personalities")
 
@@ -155,48 +133,19 @@ class UserResponse(Base):
     stress = Column(Float)
     relax = Column(Float)
     focus = Column(Float)
-    # --- KOLOM graph DIHAPUS ---
     user = relationship("User", back_populates="response_data")
     stimulation = relationship("Stimulation", back_populates="user_response_data")
-
-class FitJob(Base):
-    __tablename__ = "fit_jobs"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    label = Column(String(255))
-    reason = Column(Text)
-    user = relationship("User", back_populates="fit_jobs")
-
-class Develop(Base):
-    __tablename__ = "develops"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reason = Column(Text)
-    user = relationship("User", back_populates="develops")
-
-class Privilege(Base):
-    __tablename__ = "privileges"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reason = Column(Text)
-    user = relationship("User", back_populates="privileges")
-
+    
 class ROCCurve(Base):
-    """Menyimpan path dan informasi untuk grafik ROC yang dihasilkan."""
     __tablename__ = "roc_curves"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     graph = Column(String(255), nullable=False)
     note = Column(Text, nullable=True)
-
     user = relationship("User", back_populates="roc_curves")
 
-# --- Fungsi untuk membuat semua tabel di database ---
 def create_all_tables():
-    """Fungsi ini akan membuat semua tabel yang didefinisikan di atas."""
     print("Mencoba membuat tabel...")
-    # Base sudah tahu tentang engine dari file database.py
     Base.metadata.create_all(bind=engine)
     print("Tabel berhasil dibuat (jika belum ada).")
 

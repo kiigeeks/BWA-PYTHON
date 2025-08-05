@@ -99,6 +99,53 @@ PROMPT_TEMPLATES = {
         - Pastikan alur antar paragraf logis dan mengalir.
         - OUTPUT HARUS TEPAT DUA PARAGRAF.
         """,
+        # --- LANGKAH 1 (BARU): MINTA ANALISIS MENTAH UNTUK PROFIL UMUM ---
+        "prompt_general_analysis": """
+        Anda adalah seorang psikolog ahli.
+        
+        TUGAS: Lakukan analisis MENTAH dalam format poin-poin. JANGAN MENULIS PARAGRAF NARATIF. Fokus pada kekuatan dan potensi kelemahan dari kombinasi profil di bawah ini secara umum.
+        
+        PROFIL KANDIDAT:
+        - Kepribadian Dominan: {tipe_kepribadian}
+        - Kognitif Dominan: {kognitif_utama}
+        - Konteks Tambahan dari Bank Data:
+        ---
+        {specific_context}
+        ---
+        
+        FORMAT OUTPUT WAJIB:
+        1.  **Kekuatan Utama Profil:** Jelaskan bagaimana {tipe_kepribadian} dan {kognitif_utama} menciptakan kekuatan unik pada individu.
+        2.  **Potensi Area Pengembangan:** Jelaskan kelemahan atau tantangan yang mungkin muncul dari kombinasi profil ini.
+        """,
+
+        # --- LANGKAH 2 (BARU): MINTA PENULISAN NARASI DARI ANALISIS MENTAH ---
+        "prompt_general_narrative": """
+        Anda adalah seorang penulis laporan psikologi senior yang ahli menyusun ringkasan profil yang jelas dan profesional.
+
+        TUGAS: Tulis **DUA PARAGRAF** executive summary yang mengalir dan mudah dibaca berdasarkan analisis mentah di bawah.
+        
+        ANALISIS MENTAH UNTUK DITULIS ULANG:
+        ---
+        {general_analysis_output}
+        ---
+
+        INSTRUKSI PENULISAN WAJIB:
+        
+        **Paragraf 1: FOKUS PADA KEKUATAN PROFIL**
+        - Jelaskan karakteristik kepribadian dan kognitif utama kandidat.
+        - Uraikan **Kekuatan Utama Profil** dari analisis mentah menjadi sebuah narasi yang mulus. Jelaskan bagaimana kekuatan ini bermanfaat dalam aktivitas umum (belajar, bekerja, interaksi sosial).
+        
+        **Paragraf 2: FOKUS PADA AREA PENGEMBANGAN**
+        - Buat kalimat transisi yang halus (Contoh: "Meskipun memiliki kekuatan tersebut...").
+        - Jelaskan **Potensi Area Pengembangan** dari analisis mentah. Uraikan mengapa ini bisa menjadi tantangan bagi individu.
+        - Tutup dengan kalimat yang merangkum potensi individu secara keseluruhan.
+
+        **ATURAN MUTLAK:**
+        - Jangan gunakan format poin-poin. Semua harus dalam bentuk paragraf naratif.
+        - Gunakan format bold `**teks**` untuk menyorot istilah kunci.
+        - JANGAN sebutkan "pekerjaan", "posisi", "jabatan", atau "kecocokan".
+        - OUTPUT HARUS TEPAT DUA PARAGRAF.
+        """,
 
         "person_job_fit_full": """
         Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja yang cocok berdasarkan profil kandidat dengan format yang spesifik dan terstruktur.
@@ -151,6 +198,65 @@ PROMPT_TEMPLATES = {
      """
 }
 
+def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text):
+    """
+    Menghasilkan executive summary secara dinamis.
+    Jika 'pekerjaan' ada, buat analisis kecocokan.
+    Jika tidak, buat profil psikologis umum.
+    """
+    # Ekstrak konteks yang relevan dari bank data
+    keywords_for_summary = [tipe_kepribadian, kognitif_utama]
+    specific_context = extract_relevant_data(bank_data_text, keywords_for_summary)
+
+    final_narrative = "Konten Executive Summary gagal digenerate."
+
+    if pekerjaan:
+        # JIKA PEKERJAAN ADA: Lakukan proses 3 langkah untuk analisis kecocokan
+        print(f"   -> Pekerjaan '{pekerjaan}' terdeteksi. Menjalankan analisis kecocokan (3 langkah)...")
+        
+        # Langkah 1: Analisis & Skor
+        prompt_step1 = PROMPT_TEMPLATES["prompt_step1_deep_analysis_and_score"].format(
+            specific_context=specific_context, tipe_kepribadian=tipe_kepribadian, pekerjaan=pekerjaan, kognitif_utama=kognitif_utama)
+        deep_analysis_output = generate_ai_content(prompt_step1, model=model_ai, task_name="ES - Analisis & Skor")
+        
+        if "Error:" not in deep_analysis_output:
+            # Langkah 2: Penentuan Level
+            prompt_step2 = PROMPT_TEMPLATES["prompt_step2_determine_level"].format(deep_analysis_and_score=deep_analysis_output)
+            determined_level = generate_ai_content(prompt_step2, model=model_ai, task_name="ES - Penentuan Level").strip()
+            
+            if "Error:" not in determined_level and determined_level:
+                # Langkah 3: Penulisan Narasi
+                prompt_step3 = PROMPT_TEMPLATES["prompt_step3_write_narrative"].format(
+                    determined_level=determined_level, deep_analysis_and_score=deep_analysis_output)
+                final_narrative = generate_ai_content(prompt_step3, model=model_ai, task_name="ES - Penulisan Narasi")
+    else:
+        # JIKA PEKERJAAN KOSONG: Lakukan proses 1 langkah untuk ringkasan umum
+        print("   -> Pekerjaan tidak diisi. Menjalankan summary profil umum (2 langkah)...")
+        
+        # Langkah 1: Buat analisis mentah terlebih dahulu
+        prompt_analysis = PROMPT_TEMPLATES["prompt_general_analysis"].format(
+            tipe_kepribadian=tipe_kepribadian,
+            kognitif_utama=kognitif_utama,
+            specific_context=specific_context
+        )
+        general_analysis_output = generate_ai_content(prompt_analysis, model=model_ai, task_name="ES - Analisis Profil Umum")
+
+        if "Error:" not in general_analysis_output:
+            # Langkah 2: Tulis ulang analisis mentah menjadi narasi
+            prompt_narrative = PROMPT_TEMPLATES["prompt_general_narrative"].format(
+                general_analysis_output=general_analysis_output
+            )
+            final_narrative = generate_ai_content(prompt_narrative, model=model_ai, task_name="ES - Penulisan Narasi Profil Umum")
+        else:
+            final_narrative = general_analysis_output # Jika langkah 1 gagal, tampilkan errornya
+
+    # Format hasil akhir dari Markdown (**teks**) ke HTML (<b>teks</b>)
+    if "Error:" not in final_narrative:
+        final_narrative = final_narrative.replace('**Executive Summary**', '').strip()                  
+        return re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', final_narrative)
+    else:
+        return final_narrative
+
 # ==============================================================================
 # BAGIAN 3: FUNGSI GENERASI KONTEN AI
 # (Tidak ada perubahan di bagian ini)
@@ -160,11 +266,10 @@ def extract_relevant_data(full_text, keywords):
     Mengekstrak bagian teks yang relevan dari bank_data berdasarkan daftar keyword.
     """
     all_headings = [
-        "Openness", "Openess", "Conscientiousness", "Extraversion",
+        "Openess", "Conscientiousness", "Extraversion",
         "Agreeableness", "Neuroticism", "Kraepelin Test (Numerik)",
         "WCST (Logika)", "Digit Span (Short Term Memory)", "EXECUTIVE SUMMARY"
     ]
-    full_text = full_text.replace("Openess \n", "Openness\n")
 
     extracted_chunks = []
     for keyword in keywords:
@@ -673,7 +778,7 @@ def halaman_11(c, disclaimer_text, page_num):
 # ==============================================================================
 # BAGIAN 5: FUNGSI UTAMA GENERATOR LAPORAN
 # ==============================================================================
-def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_ai, nama_file_output, biodata_kandidat):
+def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_ai, nama_file_output, biodata_kandidat, topoplot_path_behaviour, topoplot_path_cognitive):
     """
     Fungsi utama untuk menggenerate laporan profiling lengkap dari awal hingga akhir.
     
@@ -704,8 +809,11 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     kognitif_utama_display_name = kognitif_utama_key
     
     # Konten statis lainnya
-    judul_topoplot1 = "<b>Gambar 1. Topografi response Yudanta Adhipramana terhadap stimulus behavioral trait extraversion</b>"
-    judul_topoplot2 = "<b>Gambar 2.Brain topografi Brain Wave Analysis Power stimulus digit span</b>"
+    nama_kandidat = biodata_kandidat.get('Nama', 'Kandidat') # Mengambil nama dari biodata
+    judul_topoplot1 = f"<b>Gambar 1. Topografi respons {nama_kandidat} terhadap stimulus behavioral trait {tipe_kepribadian.lower()}</b>"
+    nama_kognitif_inti = kognitif_utama_key.split('(')[0].strip()
+    judul_topoplot2 = f"<b>Gambar 2. Brain topografi Brain Wave Analysis Power stimulus {nama_kognitif_inti.lower()}</b>"
+    
     referensi_text_1 = (
         "Alloway, T. P., Gathercole, S. E., & Pickering, S. J. (2009). The cognitive and behavioral "
         "characteristics of children with low working memory. Child Development, 80(2), 606–621. "
@@ -915,55 +1023,25 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     # --------------------------------------------------------------------------
     # B: GENERASI EXECUTIVE SUMMARY (PROSES 3 LANGKAH)
     # --------------------------------------------------------------------------
-    print("1. Memulai proses 3 langkah untuk Executive Summary Otomatis...")
-    
-    # -- Langkah 1: Analisis Mendalam & Skor --
-    print("   -> Langkah 1: Meminta AI melakukan analisis & skoring...")
-    keywords_for_summary = [tipe_kepribadian, kognitif_utama_key]
-    specific_context_es = extract_relevant_data(bank_data, keywords_for_summary)
-
-    prompt_step1 = PROMPT_TEMPLATES["prompt_step1_deep_analysis_and_score"].format(
-        specific_context=specific_context_es,
-        tipe_kepribadian=tipe_kepribadian,
+    print("1. Memulai proses untuk Executive Summary Otomatis...")
+    executive_summary_formatted = generate_executive_summary(
         pekerjaan=pekerjaan,
-        kognitif_utama=kognitif_utama_display_name
+        tipe_kepribadian=tipe_kepribadian,
+        kognitif_utama=kognitif_utama_key,
+        model_ai=model_ai,
+        bank_data_text=bank_data
     )
-    deep_analysis_output = generate_ai_content(prompt_step1, model=model_ai, task_name="ES - Analisis & Skor")
-    
-    if "Error:" not in deep_analysis_output:
-        # -- Langkah 2: Penentuan Level --
-        print("   -> Langkah 2: Meminta AI menentukan level kecocokan...")
-        prompt_step2 = PROMPT_TEMPLATES["prompt_step2_determine_level"].format(
-            deep_analysis_and_score=deep_analysis_output
-        )
-        determined_level = generate_ai_content(prompt_step2, model=model_ai, task_name="ES - Penentuan Level").strip()
-
-        if "Error:" not in determined_level and determined_level:
-            # -- Langkah 3: Penulisan Narasi --
-            print(f"   -> Langkah 3: AI menentukan level: '{determined_level}'. Meminta penulisan narasi...")
-            prompt_step3 = PROMPT_TEMPLATES["prompt_step3_write_narrative"].format(
-                determined_level=determined_level,
-                deep_analysis_and_score=deep_analysis_output
-            )
-            final_narrative = generate_ai_content(prompt_step3, model=model_ai, task_name="ES - Penulisan Narasi")
-
-            if "Error:" not in final_narrative:
-                # Konversi Markdown (bold) ke HTML (<b>)
-                executive_summary_formatted = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', final_narrative)
-                print("   -- Executive Summary otomatis yang detail berhasil dibuat.")
-            else:
-                executive_summary_formatted = final_narrative
-                print(f"   -- Gagal pada langkah penulisan narasi. Respon: {executive_summary_formatted}")
-        else:
-            print(f"   -- Gagal pada langkah penentuan level. Respon: {determined_level}")
+    if "Error:" not in executive_summary_formatted:
+        print("   -- Executive Summary otomatis berhasil dibuat.")
     else:
-        print(f"   -- Gagal pada langkah analisis awal. Respon: {deep_analysis_output}")
-
-
+        print(f"   -- Gagal membuat Executive Summary. Respon: {executive_summary_formatted}")
+    
     # --------------------------------------------------------------------------
     # C: GENERASI PERSON-JOB FIT
     # --------------------------------------------------------------------------
     print("2. Menggenerate konten Person-Job Fit...")
+    keywords_for_summary = [tipe_kepribadian, kognitif_utama_key]
+    specific_context_es = extract_relevant_data(bank_data, keywords_for_summary)
     prompt_job_fit = PROMPT_TEMPLATES["person_job_fit_full"].format(
         tipe_kepribadian=tipe_kepribadian,
         kognitif_utama=kognitif_utama_display_name,
@@ -989,8 +1067,8 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
 
     # Memanggil fungsi untuk setiap halaman dengan penomoran yang benar
     halaman_1_cover(c, biodata_kandidat, executive_summary_formatted, page_num=1)
-    halaman_2(c, behavior_traits_text, "topoplot1.png", judul_topoplot1, page_num=2)
-    halaman_4(c, cognitive_traits_text, "topoplot2.png", judul_topoplot2, page_num=4)
+    halaman_2(c, behavior_traits_text, topoplot_path_behaviour, judul_topoplot1, page_num=2)
+    halaman_4(c, cognitive_traits_text, topoplot_path_cognitive, judul_topoplot2, page_num=4)
     halaman_person_fit_job(c, person_fit_job_formatted, page_num=6)
     halaman_8(c, referensi_text_1, page_num=7) 
     halaman_11(c, disclaimer_text, page_num=12) 
