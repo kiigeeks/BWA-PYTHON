@@ -2,11 +2,12 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.lib.colors import Color, black, white
+from reportlab.lib.colors import Color, black, white, HexColor
 from textwrap import wrap
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
@@ -47,13 +48,14 @@ def draw_header(c, logo_path="cia.png", is_cover=False):
 
     # --- Garis Horizontal Hitam Tebal ---
     if not is_cover:
-        c.setLineWidth(4)  # garis lebih tebal dari default (0.5)
+        c.setLineWidth(4)
         c.setStrokeColor(black)
-        garis_y = PAGE_HEIGHT - 42 * mm  # posisinya di bawah alamat
+        garis_y = PAGE_HEIGHT - 42 * mm
         c.line(25 * mm, garis_y, PAGE_WIDTH - 25 * mm, garis_y)
 
 def draw_footer(c, page_num):
     c.setFont("Times-Roman", 12)
+    c.setFillColor(black)  # Pastikan warna hitam
     c.drawRightString(PAGE_WIDTH - 10 * mm, 10 * mm, f"{page_num}")
 
 def draw_centered_image(c, img_path, y_top, width_mm):
@@ -70,6 +72,62 @@ def draw_centered_image(c, img_path, y_top, width_mm):
         print(f"Gambar '{img_path}' tidak ditemukan.")
         return y_top - 100
 
+def wrap_text_to_width(text, font_name, font_size, max_width_mm):
+    """
+    Membungkus teks berdasarkan lebar maksimum dalam mm.
+    Return list of strings yang sudah dibungkus.
+    """
+    if not text or not text.strip():
+        return [""]
+    
+    # Konversi mm ke points
+    max_width_points = max_width_mm * mm
+    
+    words = text.split()
+    lines = []
+    current_line = ""
+    
+    for word in words:
+        # Test apakah menambahkan kata ini masih muat dalam satu baris
+        if current_line:
+            test_line = current_line + " " + word
+        else:
+            test_line = word
+            
+        # Ukur lebar test_line dalam points
+        test_width = stringWidth(test_line, font_name, font_size)
+        
+        if test_width <= max_width_points:
+            # Masih muat, tambahkan ke current_line
+            current_line = test_line
+        else:
+            # Tidak muat, simpan current_line dan mulai baris baru
+            if current_line:
+                lines.append(current_line)
+            
+            # Cek apakah kata tunggal terlalu panjang
+            word_width = stringWidth(word, font_name, font_size)
+            if word_width > max_width_points:
+                # Pecah kata per karakter
+                char_line = ""
+                for char in word:
+                    test_char = char_line + char
+                    if stringWidth(test_char, font_name, font_size) <= max_width_points:
+                        char_line = test_char
+                    else:
+                        if char_line:
+                            lines.append(char_line)
+                        char_line = char
+                current_line = char_line
+            else:
+                current_line = word
+    
+    # Tambahkan baris terakhir
+    if current_line:
+        lines.append(current_line)
+    
+    return lines if lines else [""]
+
 def halaman_1_cover(c, biodata, topoplot1, topoplot2, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
@@ -77,12 +135,12 @@ def halaman_1_cover(c, biodata, topoplot1, topoplot2, page_num):
     # === Judul Tengah ===
     c.setFont("Times-Bold", 18)
     c.setFillColorRGB(0, 0.2, 0.6)
-    c.drawCentredString(PAGE_WIDTH / 2, PAGE_HEIGHT - 150, "BRAIN WAVE PROFILING")  # turunkan dari -80 → -115
+    c.drawCentredString(PAGE_WIDTH / 2, PAGE_HEIGHT - 150, "BRAIN WAVE PROFILING")
     c.setFillColor(black)
 
     # === Biodata ===
     c.setFont("Times-Roman", 12)
-    y = PAGE_HEIGHT - 170  # diturunkan dari -95 → -135 agar tidak menabrak logo
+    y = PAGE_HEIGHT - 170
     for label, value in biodata.items():
         c.drawString(60, y, f"{label}")
         c.drawString(180, y, f": {value}")
@@ -105,107 +163,250 @@ def halaman_1_cover(c, biodata, topoplot1, topoplot2, page_num):
     # === Footer ===
     draw_footer(c, page_num)
     c.showPage()
-
-def halaman_2_traits(c, data, template_path, page_num):
+def halaman_2_traits(c, data, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
-    try:
-        c.drawImage(template_path, 0, 0, width=PAGE_WIDTH, height=PAGE_HEIGHT, mask='auto')
-    except:
-        c.setFont("Times-Bold", 12)
-        c.setFillColorRGB(1, 0, 0)
-        c.drawCentredString(PAGE_WIDTH / 2, PAGE_HEIGHT / 2, f"TEMPLATE '{template_path}' TIDAK DITEMUKAN")
-        c.setFillColor(black)
+    # ===============================
+    # Set Warna
+    # ===============================
+    biru_soft = HexColor("#4F81BD")
+    kuning_gold = HexColor("#FCD116")
+    kuning_muda = HexColor("#FFF2CC")
+    merah_muda = HexColor("#FCE4D6")
 
-    c.setFont("Times-Roman", 9)
-    c.setFillColor(white)
-    wrap1 = wrap(data['trait_1_desc'], 45)
-    wrap2 = wrap(data['trait_2_desc'], 45)
+    # ===============================
+    # Gambar 1 dan 2 Box - DINAMIS MEMANJANG KE BAWAH
+    # ===============================
+    box_width = 70 * mm
+    min_box_height = 40 * mm
+    box_gap = 15 * mm
+    start_x = (210 * mm - (2 * box_width + box_gap)) / 2
+    start_y = 250 * mm
+    
+    padding_top = 30  # Ruang untuk label + judul
+    padding_bottom = 8
+    line_height = 12
+    
+    # PERBAIKAN: Hitung lebar available dengan benar (dalam mm)
+    available_width_mm = (box_width / mm) - 10  # 70mm - 10mm padding = 60mm
 
-    y1, y2 = 665, 665
-    for line in wrap1:
-        c.drawString(27 * mm, y1, line)
-        y1 -= 12
-    for line in wrap2:
-        c.drawString(112 * mm, y2, line)
-        y2 -= 12
+    # ===============================
+    # HITUNG TINGGI BOX DINAMIS
+    # ===============================
+    # PERBAIKAN: Gunakan font size yang konsisten (11 untuk keduanya)
+    font_size = 11
+    
+    # Box 1
+    wrapped_text1 = wrap_text_to_width(data['trait_1_desc'], "Times-Roman", font_size, available_width_mm)
+    content_height1_points = padding_top + (len(wrapped_text1) * line_height) + padding_bottom
+    box1_height = max(min_box_height, content_height1_points)
+    
+    # Box 2
+    wrapped_text2 = wrap_text_to_width(data['trait_2_desc'], "Times-Roman", font_size, available_width_mm)
+    content_height2_points = padding_top + (len(wrapped_text2) * line_height) + padding_bottom
+    box2_height = max(min_box_height, content_height2_points)
+    
+    c.setFillColor(biru_soft)
+    c.roundRect(start_x, start_y - box1_height, box_width, box1_height, 5 * mm, fill=1)
 
-    c.setFont("Times-Bold", 11)
+    # Label Gambar 1 - Dipusatkan secara horizontal
+    label_width = 60
+    label_height = 15
+    label_text = "Gambar 1"
+
+    label_x = start_x + (box_width - label_width) / 2
+    label_y = start_y - label_height  # dari atas box turun 15 pt
+
+    # Gambar kotak kuning
+    c.setFillColor(kuning_gold)
+    c.rect(label_x, label_y, label_width, label_height, fill=1)
+
+    # Gambar teks di tengah label
     c.setFillColor(black)
-    c.drawCentredString(PAGE_WIDTH / 2, 500, f"{data['suitability']} untuk posisi")
-    c.drawCentredString(PAGE_WIDTH / 2, 485, data["position"])
+    c.setFont("Times-Bold", 11)
+    text_width = c.stringWidth(label_text, "Times-Bold", 11)
+    text_x = label_x + (label_width - text_width) / 2
+    text_y = label_y + 4  # Secara visual agak ke tengah vertikal
+
+    c.drawString(text_x, text_y, label_text)
+
+
+    # Text Gambar 1
+    c.setFillColor(white)
+    c.setFont("Times-Bold", 11)
+    c.drawString(start_x + 5, start_y - 28, f"✓ {data['trait_1_title']}")
+    
+    # Render teks dengan batas box1 yang sesuai
+    y = start_y - 42
+    c.setFont("Times-Roman", font_size)
+    box1_bottom = start_y - box1_height + padding_bottom
+    
+    for line in wrapped_text1:
+        if y >= box1_bottom:
+            c.drawString(start_x + 5, y, line)
+            y -= line_height
+        else:
+            break
+
+    # ===============================
+    # GAMBAR BOX 2 - Tinggi sesuai konten (independen)
+    # ===============================
+    x2 = start_x + box_width + box_gap
+    c.setFillColor(biru_soft)
+    c.roundRect(x2, start_y - box2_height, box_width, box2_height, 5 * mm, fill=1)
+
+    # Label Gambar 2 - Dipusatkan secara horizontal
+    label_text = "Gambar 2"
+    label_x2 = x2 + (box_width - label_width) / 2
+    label_y2 = start_y - label_height
+
+    c.setFillColor(kuning_gold)
+    c.rect(label_x2, label_y2, label_width, label_height, fill=1)
+
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 11)
+    text_width2 = c.stringWidth(label_text, "Times-Bold", 11)
+    text_x2 = label_x2 + (label_width - text_width2) / 2
+    text_y2 = label_y2 + 4
+
+    c.drawString(text_x2, text_y2, label_text)
+
+
+    # Text Gambar 2
+    c.setFillColor(white)
+    c.setFont("Times-Bold", 11)
+    c.drawString(x2 + 5, start_y - 28, f"✓ {data['trait_2_title']}")
+    
+    # Render teks dengan batas box2 yang sesuai
+    y = start_y - 42
+    c.setFont("Times-Roman", font_size)
+    box2_bottom = start_y - box2_height + padding_bottom
+    
+    for line in wrapped_text2:
+        if y >= box2_bottom:
+            c.drawString(x2 + 5, y, line)
+            y -= line_height
+        else:
+            break
+
+    # ===============================
+    # Box Tengah (Suitability) - POSISI BERDASARKAN BOX TERPANJANG
+    # ===============================
+    # Gunakan box yang paling panjang sebagai referensi untuk elemen selanjutnya
+    max_box_height = max(box1_height, box2_height)
+    suitability_y_top = start_y - max_box_height - 25
+    suitability_width_mm = 150  # dalam mm
+    
+    # HITUNG TINGGI SUITABILITY BOX BERDASARKAN KONTEN
+    suitability_content_lines = 4  # Judul + posisi + spacing
+    for reason in data['reasons']:
+        wrapped_reason = wrap_text_to_width(reason, "Times-Roman", 10, suitability_width_mm)
+        suitability_content_lines += len(wrapped_reason)
+    
+    suitability_height = max(42 * mm, suitability_content_lines * 3.5 * mm + 20 * mm)
+    
+    c.setFillColor(kuning_muda)
+    c.setStrokeColorRGB(0.7, 0.7, 0.7)
+    c.roundRect(25 * mm, suitability_y_top - suitability_height, 160 * mm, suitability_height, 5 * mm, fill=1, stroke=1)
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 12)
+    c.drawCentredString(105 * mm, suitability_y_top - 12, f"{data['suitability']} untuk posisi")
+    c.drawCentredString(105 * mm, suitability_y_top - 26, data["position"])
 
     c.setFont("Times-Roman", 10)
-    y = 460
+    y = suitability_y_top - 36
+    suitability_bottom = suitability_y_top - suitability_height + 5
+    
     for i, reason in enumerate(data['reasons']):
-        c.drawString(25 * mm, y, f"{i+1}. {reason}")
-        y -= 14
+        wrapped_reason = wrap_text_to_width(reason, "Times-Roman", 11, suitability_width_mm)
+        for line_idx, line in enumerate(wrapped_reason):
+            if y >= suitability_bottom:  # PERBAIKAN: Gunakan >= 
+                if line_idx == 0:
+                    c.drawString(30 * mm, y, f"{i+1}. {line}")
+                else:
+                    c.drawString(35 * mm, y, line)
+                y -= 9
+            else:
+                break
 
-    y = 360
+    # ===============================
+    # Box Pengembangan - TINGGI DINAMIS BERDASARKAN KONTEN
+    # ===============================
+    pengembangan_y_top = suitability_y_top - suitability_height - 12
+    
+    # HITUNG TINGGI PENGEMBANGAN BOX BERDASARKAN KONTEN
+    pengembangan_content_lines = 2  # Judul + spacing
     for suggestion in data['suggestions']:
-        c.drawString(25 * mm, y, f"- {suggestion}")
-        y -= 14
+        wrapped_suggestion = wrap_text_to_width(suggestion, "Times-Roman", 11, suitability_width_mm)
+        pengembangan_content_lines += len(wrapped_suggestion)
+    
+    pengembangan_height = max(28 * mm, pengembangan_content_lines * 3 * mm + 15 * mm)
+    
+    c.setFillColor(merah_muda)
+    c.setStrokeColorRGB(0.7, 0.7, 0.7)
+    c.roundRect(25 * mm, pengembangan_y_top - pengembangan_height, 160 * mm, pengembangan_height, 5 * mm, fill=1, stroke=1)
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 11)
+    c.drawString(30 * mm, pengembangan_y_top - 12, "Pengembangan yang Harus Dilakukan")
 
     c.setFont("Times-Roman", 11)
-    c.setFillColor(white)
-    tips = wrap(data['tips'], 80)
-    y = 200
-    for line in tips:
-        c.drawCentredString(PAGE_WIDTH / 2, y, f'"{line}"')
-        y -= 14
+    y = pengembangan_y_top - 22
+    pengembangan_bottom = pengembangan_y_top - pengembangan_height + 5
+    
+    for suggestion in data['suggestions']:
+        wrapped_suggestion = wrap_text_to_width(suggestion, "Times-Roman", 11, suitability_width_mm)
+        for line_idx, line in enumerate(wrapped_suggestion):
+            if y >= pengembangan_bottom:  # PERBAIKAN: Gunakan >=
+                if line_idx == 0:
+                    c.drawString(30 * mm, y, f"- {line}")
+                else:
+                    c.drawString(35 * mm, y, line)
+                y -= 8
+            else:
+                break
 
+    # ===============================
+    # Footer Tips - TINGGI DINAMIS BERDASARKAN KONTEN
+    # ===============================
+    tips_y_top = pengembangan_y_top - pengembangan_height - 12
+    
+    # HITUNG TINGGI TIPS BOX BERDASARKAN KONTEN
+    wrapped_tips = wrap_text_to_width(data['tips'], "Times-Roman", 11, suitability_width_mm)
+    tips_height = max(22 * mm, len(wrapped_tips) * 3 * mm + 10 * mm)
+    
+    # Safety check: minimal 25mm dari footer
+    min_y_from_bottom = 25 * mm
+    calculated_bottom = tips_y_top - tips_height
+    
+    if calculated_bottom < min_y_from_bottom:
+        tips_y_top = min_y_from_bottom + tips_height
+    
+    c.setFillColor(biru_soft)
+    c.setStrokeColorRGB(0.7, 0.7, 0.7)
+    c.roundRect(25 * mm, tips_y_top - tips_height, 160 * mm, tips_height, 5 * mm, fill=1, stroke=1)
+    c.setFillColor(white)
+    c.setFont("Times-Roman", 11)
+    
+    # Center teks secara vertikal dalam box
+    total_text_height = len(wrapped_tips) * 8
+    start_text_y = tips_y_top - (tips_height / 2) + (total_text_height / 2)
+    
+    y = start_text_y
+    tips_bottom = tips_y_top - tips_height + 3
+    
+    for line in wrapped_tips:
+        if y >= tips_bottom:  # PERBAIKAN: Gunakan >=
+            c.drawCentredString(105 * mm, y, f'"{line}"')
+            y -= 8
+        else:
+            break
+
+    # Reset warna dan footer
+    c.setFillColor(black)
     draw_footer(c, page_num)
     c.showPage()
-
-from reportlab.pdfbase.pdfmetrics import stringWidth
-from reportlab.lib.colors import Color, black
-from reportlab.lib.units import mm
-
-def wrap_text_to_width(text, font_name, font_size, max_width):
-    def break_long_word(word):
-        parts = []
-        current = ""
-        for char in word:
-            test = current + char
-            if stringWidth(test, font_name, font_size) <= max_width:
-                current = test
-            else:
-                if current:
-                    parts.append(current)
-                current = char
-        if current:
-            parts.append(current)
-        return parts
-
-    words = text.split()
-    lines = []
-    current_line = ""
-
-    for word in words:
-        test_line = current_line + " " + word if current_line else word
-        width = stringWidth(test_line, font_name, font_size)
-
-        if width <= max_width:
-            current_line = test_line
-        else:
-            if stringWidth(word, font_name, font_size) > max_width:
-                if current_line:
-                    lines.append(current_line)
-                broken = break_long_word(word)
-                for part in broken[:-1]:
-                    lines.append(part)
-                current_line = broken[-1]
-            else:
-                if current_line:
-                    lines.append(current_line)
-                current_line = word
-
-    if current_line:
-        lines.append(current_line)
-
-    return lines
-
+    
 def halaman_3_job_fit(c, job_data, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
@@ -227,18 +428,20 @@ def halaman_3_job_fit(c, job_data, page_num):
     line_height = 12
 
     # --- Padding top/bottom dalam point ---
-    padding_top = 20  # atas dari batas box
-    padding_bottom = 12  # bawah dari batas box
+    padding_top = 20
+    padding_bottom = 12
     min_box_height = 45 * mm
+
+    # Lebar teks dalam mm (box width - padding kiri kanan)
+    text_width_mm = (box_width - 15) / mm
 
     # --- Preprocess semua data job: bungkus teks + hitung tinggi kotak ---
     box_data = []
     for job in job_data:
-        max_text_width = box_width - 15  # padding kiri-kanan
-        wrapped = wrap_text_to_width(job['reason'], font_name, font_size, max_text_width)
+        wrapped = wrap_text_to_width(job['reason'], font_name, font_size, text_width_mm)
         num_lines = len(wrapped)
-        content_height = padding_top + (num_lines * line_height) + padding_bottom
-        dynamic_height = max(min_box_height, content_height)
+        content_height_points = padding_top + (num_lines * line_height) + padding_bottom
+        dynamic_height = max(min_box_height, content_height_points)  # content_height_points sudah dalam points
         box_data.append({
             "job": job,
             "wrapped": wrapped,
@@ -277,21 +480,16 @@ def halaman_3_job_fit(c, job_data, page_num):
             c.setFont(font_name, font_size)
             for i_line, line in enumerate(item["wrapped"]):
                 line_y = text_y - 30 - (i_line * line_height)
-
-    # Cegah baris terlalu dekat atau melewati batas bawah box
+                # Cegah baris terlalu dekat atau melewati batas bawah box
                 if line_y < (y - item["height"] + padding_bottom):
                     break
-
                 c.drawString(text_x, line_y, line)
-
 
         y_cursor -= max_row_height + v_gap
 
     draw_footer(c, page_num)
     c.showPage()
-# =========================================================
-# ===== FUNGSI INI TELAH DIUBAH SEPENUHNYA ================
-# =========================================================
+
 def halaman_4_disclaimer(c, disclaimer_text, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
@@ -303,7 +501,7 @@ def halaman_4_disclaimer(c, disclaimer_text, page_num):
     # Margin untuk area teks
     left_margin = 20 * mm
     right_margin = 20 * mm
-    top_margin = PAGE_HEIGHT - 170 # Posisi Y untuk bagian atas paragraf
+    top_margin = PAGE_HEIGHT - 170
     
     # Lebar area yang tersedia untuk teks
     text_width = PAGE_WIDTH - left_margin - right_margin
@@ -313,30 +511,28 @@ def halaman_4_disclaimer(c, disclaimer_text, page_num):
         name='Justified',
         fontName='Times-Roman',
         fontSize=10,
-        leading=15,  # Jarak antar baris
+        leading=15,
         alignment=TA_JUSTIFY,
         underlineColor=None,
         underlineWidth=0.4,
-        underlineOffset= -2.5    
+        underlineOffset=-2.5    
     )
     
     # Ganti spasi biasa dengan spasi yang lebih 'fleksibel' untuk justifikasi yang lebih baik
-    # dan ubah kalimat-kalimat terpisah menjadi satu blok teks
     text_for_paragraph = disclaimer_text.replace('\n', ' ').replace('  ', ' ')
     
     # Buat objek Paragraf
     p = Paragraph(text_for_paragraph, style)
     
     # Hitung tinggi yang dibutuhkan oleh paragraf dan gambar ke kanvas
-    w, h = p.wrapOn(c, text_width, PAGE_HEIGHT) # wrapOn untuk kalkulasi
-    p.drawOn(c, left_margin, top_margin - h) # drawOn untuk menggambar
+    w, h = p.wrapOn(c, text_width, PAGE_HEIGHT)
+    p.drawOn(c, left_margin, top_margin - h)
 
     c.setFont("Times-Bold", 10)
     c.setFillColorRGB(0.6, 0.6, 0.6)
 
     draw_footer(c, page_num)
     c.showPage()
-
 
 # ================== MAIN EKSEKUSI =====================
 if __name__ == "__main__":
@@ -361,7 +557,7 @@ if __name__ == "__main__":
         "suitability": "KURANG SESUAI",
         "position": "Manager Marketing & Promotion",
         "reasons": [
-            "Rentan terhadap cmas di kondisi dinamis",
+            "Rentan terhadap cemas di kondisi dinamis",
             "Stres berlebihan berisiko muncul",
             "Butuh kepastian & rencana terukur"
         ],
@@ -375,14 +571,13 @@ if __name__ == "__main__":
 
     job_fit_data = [
         {"title": "Analis Data / Data Scientist", "reason": "Penggunaan data yang jelas dan metodis membantu mengurangi kecemasan dan meningkatkan kontrol terhadap hasil."},
-        {"title": "Akuntansi dan Keuangan", "reason": "Membutuhkan ketelitian dan kemampuan analitis yang tinggi."},
+        {"title": "Akuntansi dan Keuangan", "reason": "Membutuhkan ketelitian dan kemampuan analitis yang tinggi. Ini adalah contoh teks yang sangat panjang untuk menguji fungsi text wrapping yang diperbaiki. Teks ini harus secara otomatis dibungkus dan membuat box menjadi lebih tinggi sesuai dengan panjang konten yang ada di dalamnya."},
         {"title": "Penelitian Kuantitatif", "reason": "Bidang ini membutuhkan keterampilan logika untuk merancang eksperimen, menganalisis data, dan menarik kesimpulan."},
         {"title": "Analis Risiko", "reason": "Kecenderungan untuk mengantisipasi masalah yang terkait dengan neurotisisme bisa menjadi kekuatan dalam mengidentifikasi risiko lebih awal."},
         {"title": "Compliance Officer", "reason": "Neurotisisme yang tinggi dapat membantu dalam mengidentifikasi potensi masalah lebih awal, mencegah kesalahan atau pelanggaran yang dapat mempengaruhi kualitas."},
-        {"title": "IT Analyst / Sistem Analis", "reason": "Lingkungan yang lebih terstruktur dan berbasis data membantu mengurangi kecemasan dan memberikan cara untuk merencanakan dan memecahkan masalah secara terorganisir. AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+        {"title": "IT Analyst / Sistem Analis", "reason": "Lingkungan yang lebih terstruktur dan berbasis data membantu mengurangi kecemasan dan memberikan cara untuk merencanakan dan memecahkan masalah secara terorganisir. Teks panjang ini juga akan diuji untuk memastikan box dapat menyesuaikan tingginya dengan baik dan tidak overflow."}
     ]
     
-    # Pastikan teks ini menjadi satu blok panjang agar paragrafnya menyatu
     disclaimer_text = (
         'Profiling ini <b>bukan merupakan tes psikologi</b> melainkan '
         '<b>deskripsi profile respon elektrofisiologis sistem syaraf terhadap stimulus behavioral traits dan cognitive traits</b> '
@@ -408,9 +603,8 @@ if __name__ == "__main__":
         'hasil yang konsisten potensi EEG sebagai alat yang kuat dalam analisis psikologis.'
     )
 
-
     halaman_1_cover(c, biodata, "topoplot1.png", "topoplot2.png", page_num=1)
-    halaman_2_traits(c, personality_data, "body.png", page_num=2)
+    halaman_2_traits(c, personality_data, page_num=2)
     halaman_3_job_fit(c, job_fit_data, page_num=3)
     halaman_4_disclaimer(c, disclaimer_text, page_num=4)
 
