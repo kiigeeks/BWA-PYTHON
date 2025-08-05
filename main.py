@@ -44,7 +44,7 @@ app.add_middleware(
 async def read_root():
     return {"message": "BWA API is running and ready!"}
 
-@app.post("/v1/bwa/users/login", summary="User Login", response_model=StandardResponse[TokenPayload], tags=["Users"])
+@app.post("/v1/bwa/users/login", summary="User Login", response_model=StandardResponse[TokenPayload], tags=["BWA"])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
     db: Session = Depends(get_db)
@@ -59,7 +59,7 @@ async def login_for_access_token(
     access_token = create_access_token(data={"sub": user.username, "user_id": user.id})
     return StandardResponse(message="Login berhasil", payload=TokenPayload(access_token=access_token, token_type="bearer"))
 
-@app.post("/v1/bwa/analyze/", summary="Admin: Register Client and Analyze Data from EDF", response_model=StandardResponse[AnalysisResult], tags=["Analysis"])
+@app.post("/v1/bwa/analyze/", summary="Admin: Register Client and Analyze Data from EDF", response_model=StandardResponse[AnalysisResult], tags=["BWA"])
 async def analyze_edf(
     db: Session = Depends(get_db), 
     current_admin: models.User = Depends(get_current_user), 
@@ -203,7 +203,7 @@ async def analyze_edf(
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-@app.post("/v1/bwa/tools/edf-to-csv", summary="Convert EDF to a single CSV file", response_model=StandardResponse[FilePathPayload], tags=["Tools"])
+@app.post("/v1/bwa/tools/edf-to-csv", summary="Convert EDF to a single CSV file", response_model=StandardResponse[FilePathPayload], tags=["BWA"])
 async def convert_edf_to_csv_endpoint(file: UploadFile = File(...)):
     temp_file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(temp_file_path, "wb") as f:
@@ -216,7 +216,7 @@ async def convert_edf_to_csv_endpoint(file: UploadFile = File(...)):
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-@app.post("/v1/bwa/tools/edf-to-ica-csv", summary="Process EDF with ICA and save to a single CSV", response_model=StandardResponse[FilePathPayload], tags=["Tools"])
+@app.post("/v1/bwa/tools/edf-to-ica-csv", summary="Process EDF with ICA and save to a single CSV", response_model=StandardResponse[FilePathPayload], tags=["BWA"])
 async def process_edf_with_ica_endpoint(file: UploadFile = File(...)):
     temp_file_path = f"./{uuid.uuid4()}_{file.filename}"
     with open(temp_file_path, "wb") as f:
@@ -232,7 +232,7 @@ async def process_edf_with_ica_endpoint(file: UploadFile = File(...)):
 @app.get(
     "/v1/bwa/tools/download", 
     summary="Download a generated file", 
-    tags=["Tools"],
+    tags=["BWA"],
     responses={
         200: {"description": "Returns the requested file for download."},
         404: {"description": "File not found"},
@@ -251,7 +251,7 @@ async def download_file(filepath: str):
         filename=os.path.basename(filepath)
     )
 
-@app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["Users"])
+@app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["BWA"])
 async def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_user = db.query(models.User).options(
         joinedload(models.User.personalities_data), 

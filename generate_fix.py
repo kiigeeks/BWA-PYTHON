@@ -157,19 +157,19 @@ PROMPT_TEMPLATES = {
         Individu dengan kepribadian [KEPRIBADIAN] dan kemampuan [KOGNITIF] akan optimal dalam pekerjaan yang membutuhkan [sebutkan karakteristik kerja yang spesifik sesuai profil]. Berikut adalah beberapa bidang kerja yang sesuai:
         
         **[Nama Kategori Bidang 1]**
-        [Job Title 1], [Job Title 2], [Job Title 3]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2], [Job Title 3]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 2]**  
-        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 3]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 4]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 5]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 2-3 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
 
         **SEKARANG, TUGAS ANDA:**
         Buatlah analisis rekomendasi pekerjaan untuk profil di bawah ini menggunakan format template di atas SECARA PERSIS.
