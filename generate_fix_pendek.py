@@ -364,36 +364,153 @@ def halaman_1_cover(c, biodata, topoplot_behavior, topoplot_cognitive, tipe_kepr
 def halaman_2_traits(c, data, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
-    biru_soft, kuning_gold, kuning_muda, merah_muda = HexColor("#4F81BD"), HexColor("#FCD116"), HexColor("#FFF2CC"), HexColor("#FCE4D6")
+    
+    # ===============================
+    # Set Warna (sesuai gambar referensi)
+    # ===============================
+    biru_vibrant = HexColor("#1E88E5")  # Biru cerah seperti gambar
+    kuning_gold = HexColor("#FCD116")  # Kuning gold awal
+    kuning_muda = HexColor("#FFF2CC")
+    merah_muda = HexColor("#FCE4D6")
+    
+    # ===============================
+    # Warna Border (lebih gelap dari warna box)
+    # ===============================
+    biru_border = HexColor("#1565C0")  # Lebih gelap dari biru_vibrant
+    kuning_border = HexColor("#D4A914")  # Lebih gelap dari kuning_gold
+    kuning_muda_border = HexColor("#D4C299")  # Lebih gelap dari kuning_muda
+    merah_muda_border = HexColor("#D4BBA3")  # Lebih gelap dari merah_muda
+    
+    # Styles for content
     styles = getSampleStyleSheet()
     style_alasan = ParagraphStyle(name='alasan', parent=styles['Normal'], fontName='Times-Roman', fontSize=10, leading=14)
     style_saran = ParagraphStyle(name='saran', parent=styles['Normal'], fontName='Times-Roman', fontSize=10, leading=14)
     style_tips = ParagraphStyle(name='tips', parent=styles['Normal'], fontName='Times-Roman', fontSize=11, leading=14, alignment=TA_CENTER, textColor=white)
 
-    box_width, box_gap = 70 * mm, 15 * mm
-    start_x, start_y = (PAGE_WIDTH - (2 * box_width + box_gap)) / 2, 250 * mm
-
-    c.setFillColor(biru_soft); c.roundRect(start_x, start_y - 50 * mm, box_width, 50 * mm, 5*mm, fill=1)
-    c.setFillColor(kuning_gold); c.rect(start_x + (box_width - 60)/2, start_y - 15, 60, 15, fill=1)
-    c.setFillColor(black); c.setFont("Times-Bold", 11); c.drawCentredString(start_x + box_width/2, start_y - 11, "Gambar 1")
-    c.setFillColor(white); c.drawString(start_x + 15, start_y - 28, f"✓ {data['trait_1_title']}")
-    p = Paragraph(data['trait_1_desc'], ParagraphStyle(name='desc1', textColor=white, fontName='Times-Roman', fontSize=10, leading=12))
-    p.wrapOn(c, box_width - 30, 40*mm); p.drawOn(c, start_x+15, start_y-35-p.height)
+    # ===============================
+    # KONSISTEN SPACING & DYNAMIC BOX SIZING
+    # ===============================
+    consistent_gap = 7 * mm
+    box_width = 78 * mm  # Sedikit lebih lebar dari original
+    box_gap = 5 * mm     # Gap lebih kecil untuk lebih rapat
+    start_x = (PAGE_WIDTH - (2 * box_width + box_gap)) / 2
+    start_y = 250 * mm
     
+    # Dynamic height calculation untuk trait boxes
+    min_box_height = 50 * mm
+    
+    # Calculate height for Box 1
+    p1_temp = Paragraph(data['trait_1_desc'], ParagraphStyle(name='temp1', textColor=white, fontName='Times-Roman', fontSize=10, leading=12))
+    w1, h1 = p1_temp.wrapOn(c, box_width - 30, 100*mm)
+    box1_height = max(min_box_height, h1 + 35)  # 35 untuk header + padding
+    
+    # Calculate height for Box 2
+    p2_temp = Paragraph(data['trait_2_desc'], ParagraphStyle(name='temp2', textColor=white, fontName='Times-Roman', fontSize=10, leading=12))
+    w2, h2 = p2_temp.wrapOn(c, box_width - 30, 100*mm)
+    box2_height = max(min_box_height, h2 + 35)  # 35 untuk header + padding
+    
+    # ===============================
+    # BOX 1 - Dynamic height dengan border
+    # ===============================
+    c.setFillColor(biru_vibrant)
+    c.setStrokeColor(biru_border)
+    c.setLineWidth(1.5)
+    c.roundRect(start_x, start_y - box1_height, box_width, box1_height, 5*mm, fill=1, stroke=1)
+    
+    # Label Gambar 1
+    label_width, label_height = 70, 20
+    label_x = start_x + (box_width - label_width) / 2
+    label_y = start_y - 15
+    c.setFillColor(kuning_gold)
+    c.setStrokeColor(kuning_border)
+    c.setLineWidth(1)
+    c.rect(label_x, label_y, label_width, label_height, fill=1, stroke=1)
+    
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 12)
+    c.drawCentredString(start_x + box_width/2, label_y + 4, "Gambar 1")
+    
+    # Content Box 1
+    c.setFillColor(white)
+    c.setFont("Times-Bold", 12)
+    title_text = f"✓ {data['trait_1_title']}"
+    title_width = c.stringWidth(title_text, "Times-Bold", 12)
+    title_x = start_x + (box_width - title_width) / 2
+    c.drawString(title_x, start_y - 28, title_text)
+    
+    # Description Box 1
+    p1 = Paragraph(data['trait_1_desc'], ParagraphStyle(name='desc1', textColor=white, fontName='Times-Roman', fontSize=10, leading=12, alignment=TA_CENTER))
+    p1.wrapOn(c, box_width - 30, box1_height - 40)
+    p1.drawOn(c, start_x + 15, start_y - 40 - p1.height)
+    
+    # ===============================
+    # BOX 2 - Dynamic height dengan border
+    # ===============================
     x2 = start_x + box_width + box_gap
-    c.setFillColor(biru_soft); c.roundRect(x2, start_y - 50 * mm, box_width, 50 * mm, 5*mm, fill=1)
-    c.setFillColor(kuning_gold); c.rect(x2 + (box_width - 60)/2, start_y - 15, 60, 15, fill=1)
-    c.setFillColor(black); c.setFont("Times-Bold", 11); c.drawCentredString(x2 + box_width/2, start_y-11, "Gambar 2")
-    c.setFillColor(white); c.drawString(x2 + 15, start_y-28, f"✓ {data['trait_2_title']}")
-    p2 = Paragraph(data['trait_2_desc'], ParagraphStyle(name='desc2', textColor=white, fontName='Times-Roman', fontSize=10, leading=12))
-    p2.wrapOn(c, box_width - 30, 40*mm); p2.drawOn(c, x2+15, start_y-35-p2.height)
+    c.setFillColor(biru_vibrant)
+    c.setStrokeColor(biru_border)
+    c.setLineWidth(1.5)
+    c.roundRect(x2, start_y - box2_height, box_width, box2_height, 5*mm, fill=1, stroke=1)
+    
+    # Label Gambar 2
+    label_x2 = x2 + (box_width - label_width) / 2
+    c.setFillColor(kuning_gold)
+    c.setStrokeColor(kuning_border)
+    c.setLineWidth(1)
+    c.rect(label_x2, label_y, label_width, label_height, fill=1, stroke=1)
+    
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 12)
+    c.drawCentredString(x2 + box_width/2, label_y + 4, "Gambar 2")
+    
+    # Content Box 2
+    c.setFillColor(white)
+    c.setFont("Times-Bold", 12)
+    title_text2 = f"✓ {data['trait_2_title']}"
+    title_width2 = c.stringWidth(title_text2, "Times-Bold", 12)
+    title_x2 = x2 + (box_width - title_width2) / 2
+    c.drawString(title_x2, start_y - 28, title_text2)
+    
+    # Description Box 2
+    p2 = Paragraph(data['trait_2_desc'], ParagraphStyle(name='desc2', textColor=white, fontName='Times-Roman', fontSize=10, leading=12, alignment=TA_CENTER))
+    p2.wrapOn(c, box_width - 30, box2_height - 40)
+    p2.drawOn(c, x2 + 15, start_y - 40 - p2.height)
 
-    suitability_y_top = start_y - 50*mm - 15*mm
-    c.setFillColor(kuning_muda); c.setStrokeColorRGB(0.7,0.7,0.7); c.roundRect(25*mm, 120*mm, 160*mm, 65*mm, 5*mm, fill=1, stroke=1)
-    c.setFillColor(black); c.setFont("Times-Bold", 12)
-    c.drawCentredString(105*mm, suitability_y_top - 12, f"{data['suitability']} untuk posisi")
-    c.drawCentredString(105*mm, suitability_y_top - 26, data["position"])
-    y = suitability_y_top - 40
+    # ===============================
+    # DYNAMIC POSITIONING - Box selanjutnya mengikuti box terpanjang
+    # ===============================
+    max_box_height = max(box1_height, box2_height)
+    suitability_y_top = start_y - max_box_height - consistent_gap
+    
+    # Calculate dynamic height untuk suitability box
+    temp_y = suitability_y_top - 40
+    total_reasons_height = 0
+    for i, reason_md in enumerate(data['reasons']):
+        reason_html = markdown_to_html_platypus(reason_md)
+        p_temp = Paragraph(f"{i+1}. {reason_html}", style_alasan)
+        w, h = p_temp.wrapOn(c, 150*mm, 20*mm)
+        total_reasons_height += (h + 4)
+    
+    suitability_height = max(65*mm, total_reasons_height + 40*mm)  # 40mm untuk header + padding
+    
+    # ===============================
+    # BOX SUITABILITY - dengan transparansi dan border
+    # ===============================
+    c.setFillColorRGB(255/255, 242/255, 204/255, alpha=0.85)  # Kuning muda dengan transparansi
+    c.setStrokeColor(kuning_muda_border)
+    c.setLineWidth(1.5)
+    c.roundRect(25*mm, suitability_y_top - suitability_height, 160*mm, suitability_height, 5*mm, fill=1, stroke=1)
+    
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 12)
+    c.drawCentredString(105*mm, suitability_y_top - 20, f"■ {data['suitability']} untuk posisi")
+    c.drawCentredString(105*mm, suitability_y_top - 35, data["position"])
+    
+    # Alasan content
+    c.setFont("Times-Bold", 12)
+    c.drawString(35*mm, suitability_y_top - 55, "Alasan :")
+    
+    y = suitability_y_top - 70
     for i, reason_md in enumerate(data['reasons']):
         reason_html = markdown_to_html_platypus(reason_md)
         p = Paragraph(f"{i+1}. {reason_html}", style_alasan)
@@ -401,27 +518,68 @@ def halaman_2_traits(c, data, page_num):
         p.drawOn(c, 30*mm, y-h)
         y -= (h + 4)
 
-    pengembangan_y_top = 120*mm - 12*mm
-    c.setFillColor(merah_muda); c.setStrokeColorRGB(0.7,0.7,0.7); c.roundRect(25*mm, 60*mm, 160*mm, 48*mm, 5*mm, fill=1, stroke=1)
-    c.setFillColor(black); c.setFont("Times-Bold", 11)
-    c.drawString(30*mm, pengembangan_y_top - 12, "Pengembangan yang Harus Dilakukan")
-    y = pengembangan_y_top - 25
+    # ===============================
+    # BOX PENGEMBANGAN - Dynamic positioning dengan transparansi
+    # ===============================
+    pengembangan_y_top = suitability_y_top - suitability_height - consistent_gap
+    
+    # Calculate dynamic height untuk pengembangan box
+    total_suggestions_height = 0
     for suggestion_md in data['suggestions']:
         suggestion_html = markdown_to_html_platypus(suggestion_md)
-        p = Paragraph(f"- {suggestion_html}", style_saran)
+        p_temp = Paragraph(f"• {suggestion_html}", style_saran)
+        w, h = p_temp.wrapOn(c, 150*mm, 20*mm)
+        total_suggestions_height += (h + 4)
+    
+    pengembangan_height = max(48*mm, total_suggestions_height + 30*mm)  # 30mm untuk header + padding
+    
+    c.setFillColorRGB(252/255, 228/255, 214/255, alpha=0.85)  # Merah muda dengan transparansi
+    c.setStrokeColor(merah_muda_border)
+    c.setLineWidth(1.5)
+    c.roundRect(25*mm, pengembangan_y_top - pengembangan_height, 160*mm, pengembangan_height, 5*mm, fill=1, stroke=1)
+    
+    c.setFillColor(black)
+    c.setFont("Times-Bold", 13)
+    c.drawCentredString(105*mm, pengembangan_y_top - 20, "Pengembangan yang Harus Dilakukan")
+    
+    y = pengembangan_y_top - 35
+    for suggestion_md in data['suggestions']:
+        suggestion_html = markdown_to_html_platypus(suggestion_md)
+        p = Paragraph(f"• {suggestion_html}", style_saran)
         w, h = p.wrapOn(c, 150*mm, 20*mm)
         p.drawOn(c, 30*mm, y-h)
         y -= (h + 4)
 
-    c.setFillColor(biru_soft); c.setStrokeColorRGB(0.7,0.7,0.7); c.roundRect(25*mm, 30*mm, 160*mm, 25*mm, 5*mm, fill=1, stroke=1)
+    # ===============================
+    # BOX TIPS - Dynamic positioning
+    # ===============================
+    tips_y_top = pengembangan_y_top - pengembangan_height - consistent_gap
+    
+    # Calculate tips height
     tips_html = markdown_to_html_platypus(data['tips'])
-    p = Paragraph(f'{tips_html}', style_tips)
-    w,h = p.wrapOn(c, 150*mm, 20*mm)
-    p.drawOn(c, (PAGE_WIDTH-w)/2, 30*mm + (25*mm-h)/2)
+    p_tips_temp = Paragraph(f'{tips_html}', style_tips)
+    w_tips, h_tips = p_tips_temp.wrapOn(c, 150*mm, 20*mm)
+    tips_height = max(25*mm, h_tips + 10*mm)  # 10mm padding
+    
+    # Safety check: minimal 25mm dari footer
+    min_y_from_bottom = 25 * mm
+    calculated_bottom = tips_y_top - tips_height
+    if calculated_bottom < min_y_from_bottom:
+        tips_y_top = min_y_from_bottom + tips_height
+
+    c.setFillColor(biru_vibrant)
+    c.setStrokeColor(biru_border)
+    c.setLineWidth(1.5)
+    c.roundRect(25*mm, tips_y_top - tips_height, 160*mm, tips_height, 5*mm, fill=1, stroke=1)
+    
+    # Tips content - centered vertically
+    p_tips = Paragraph(f'"{tips_html}"', style_tips)
+    w_tips, h_tips = p_tips.wrapOn(c, 150*mm, tips_height - 10*mm)
+    p_tips.drawOn(c, (PAGE_WIDTH-w_tips)/2, tips_y_top - (tips_height + h_tips)/2)
 
     draw_footer(c, page_num)
     c.showPage()
-    
+        
 def halaman_3_job_fit(c, job_data, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
