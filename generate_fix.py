@@ -157,7 +157,7 @@ PROMPT_TEMPLATES = {
         Individu dengan kepribadian [KEPRIBADIAN] dan kemampuan [KOGNITIF] akan optimal dalam pekerjaan yang membutuhkan [sebutkan karakteristik kerja yang spesifik sesuai profil]. Berikut adalah beberapa bidang kerja yang sesuai:
         
         **[Nama Kategori Bidang 1]**
-        [Job Title 1], [Job Title 2], [Job Title 3]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 2]**  
         [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
@@ -169,6 +169,9 @@ PROMPT_TEMPLATES = {
         [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 5]**
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+
+        **[Nama Kategori Bidang 6]**
         [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
 
         **SEKARANG, TUGAS ANDA:**
@@ -184,14 +187,14 @@ PROMPT_TEMPLATES = {
         3. **FORMAT KATEGORI**: 
         - Gunakan **Nama Kategori** (contoh: **Sales & Account Management**, **Customer Service & Client Relations**)
         - Daftar 2-3 job titles dipisah koma, diakhiri titik
-        - Langsung lanjut dengan penjelasan dalam 1 paragraf (2-3 kalimat)
+        - Langsung lanjut dengan penjelasan dalam 1 paragraf (1-2 kalimat)
         4. **BERIKAN 5 KATEGORI** bidang kerja yang berbeda dan spesifik
         5. **PENJELASAN SETIAP KATEGORI HARUS**:
         - Menjelaskan mengapa cocok dengan profil
         - Menyebutkan bagaimana kepribadian digunakan
         - Menyebutkan bagaimana kemampuan kognitif dimanfaatkan
         - Memberikan contoh tugas atau situasi kerja spesifik
-        6. **BAHASA**: Gunakan Bahasa Indonesia yang profesional dan formal
+        6. **BAHASA**: Gunakan Bahasa Indonesia yang profesional, formal, dan mudah dipahami orang awam
         7. **JANGAN** gunakan bullet points, numbering, atau tag HTML
         8. **KONSISTENSI**: Ikuti format template tanpa variasi apapun
         9. **SPESIFIK**: Semua rekomendasi harus logis dan relevan dengan kombinasi kepribadian + kognitif yang diberikan
