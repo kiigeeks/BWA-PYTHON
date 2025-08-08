@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship
 from database import Base, engine
 
 # ==============================================================================
-#  1. TABEL UTAMA (CENTRAl TABLE)
+#  1. TABEL UTAMA (CENTRAL TABLE)
 # ==============================================================================
 
 class User(Base):
@@ -27,17 +27,12 @@ class User(Base):
     test_date = Column(Date, nullable=True)
     test_location = Column(String(255), nullable=True)
     roles = Column(Enum('admin', 'user', name='user_roles_enum'), default='user')
-    conclusions = Column(Text, nullable=True)
-    report = Column(String(255), nullable=True)
-    jobs = Column(String(255), nullable=True)
-    note_jobs = Column(String(255), nullable=True)
+    jobs = Column(String(255), nullable=True)  # Masih ada, karena kamu tidak minta hapus
     laporan_panjang = Column(String(255), nullable=True)
     laporan_pendek = Column(String(255), nullable=True)
 
     personalities_data = relationship("UserPersonality", back_populates="user", cascade="all, delete-orphan")
-    personality_accuracies = relationship("UserPersonalityAccuracy", back_populates="user", cascade="all, delete-orphan")
     cognitive_data = relationship("UserCognitive", back_populates="user", cascade="all, delete-orphan")
-    split_brain_data = relationship("UserSplitBrain", back_populates="user", cascade="all, delete-orphan")
     response_data = relationship("UserResponse", back_populates="user", cascade="all, delete-orphan")
     roc_curves = relationship("ROCCurve", back_populates="user", cascade="all, delete-orphan")
 
@@ -53,7 +48,6 @@ class Personality(Base):
     description = Column(Text, nullable=True)
     explanation = Column(Text, nullable=True)
     user_personalities = relationship("UserPersonality", back_populates="personality")
-    user_accuracy_data = relationship("UserPersonalityAccuracy", back_populates="personality")
 
 class Test(Base):
     __tablename__ = "tests"
@@ -62,7 +56,6 @@ class Test(Base):
     title = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     user_cognitive_data = relationship("UserCognitive", back_populates="test")
-    user_split_brain_data = relationship("UserSplitBrain", back_populates="test")
 
 class Stimulation(Base):
     __tablename__ = "stimulations"
@@ -79,60 +72,31 @@ class UserPersonality(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     personality_id = Column(Integer, ForeignKey("personalities.id"), nullable=False)
-    engagement = Column(Float, nullable=True)
-    excitement = Column(Float, nullable=True)
-    interest = Column(Float, nullable=True)
     score = Column(Float, nullable=True)
     brain_topography = Column(String(255), nullable=True)
     user = relationship("User", back_populates="personalities_data")
     personality = relationship("Personality", back_populates="user_personalities")
-
-class UserPersonalityAccuracy(Base):
-    __tablename__ = "user_personality_accuracies"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    personality_id = Column(Integer, ForeignKey("personalities.id"), nullable=False)
-    AF3 = Column(Float)
-    T7 = Column(Float)
-    Pz = Column(Float)
-    T8 = Column(Float)
-    AF4 = Column(Float)
-    average = Column(Float)
-    user = relationship("User", back_populates="personality_accuracies")
-    personality = relationship("Personality", back_populates="user_accuracy_data")
 
 class UserCognitive(Base):
     __tablename__ = "user_cognitive"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False)
-    engagement = Column(Float)
-    excitement = Column(Float)
-    interest = Column(Float)
     score = Column(Float)
     brain_topography = Column(String(255))
     user = relationship("User", back_populates="cognitive_data")
     test = relationship("Test", back_populates="user_cognitive_data")
-
-class UserSplitBrain(Base):
-    __tablename__ = "user_split_brain"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    test_id = Column(Integer, ForeignKey("tests.id"), nullable=False)
-    left = Column(Float)
-    right = Column(Float)
-    user = relationship("User", back_populates="split_brain_data")
-    test = relationship("Test", back_populates="user_split_brain_data")
 
 class UserResponse(Base):
     __tablename__ = "user_response"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     stimulation_id = Column(Integer, ForeignKey("stimulations.id"), nullable=False)
-    attention = Column(Float)
-    stress = Column(Float)
-    relax = Column(Float)
+    engagement = Column(Float)
+    interest = Column(Float)
     focus = Column(Float)
+    relaxation = Column(Float)
+    attention = Column(Float)
     user = relationship("User", back_populates="response_data")
     stimulation = relationship("Stimulation", back_populates="user_response_data")
     
