@@ -16,18 +16,19 @@ class TokenPayload(BaseModel):
 
 # ==================================
 # SKEMA UNTUK DATA RELASI (NESTED)
-# (Tidak ada perubahan di bagian ini)
 # ==================================
 
 class UserPersonality(BaseModel):
     score: Optional[float] = None
     brain_topography: Optional[str] = None
-    class Config: from_attributes = True
+    class Config: 
+        from_attributes = True
 
 class UserCognitive(BaseModel):
     score: Optional[float] = None
     brain_topography: Optional[str] = None
-    class Config: from_attributes = True
+    class Config: 
+        from_attributes = True
 
 class UserResponse(BaseModel):
     engagement: Optional[float] = None
@@ -35,16 +36,17 @@ class UserResponse(BaseModel):
     focus: Optional[float] = None
     relaxation: Optional[float] = None
     attention: Optional[float] = None
-    class Config: from_attributes = True
+    class Config: 
+        from_attributes = True
 
 class ROCCurve(BaseModel):
     graph: str
     note: Optional[str] = None
-    class Config: from_attributes = True
+    class Config: 
+        from_attributes = True
 
 # ==================================
 # SKEMA UTAMA USER (DENGAN RELASI)
-# (Tidak ada perubahan di bagian ini)
 # ==================================
 
 class User(BaseModel):
@@ -71,27 +73,19 @@ class User(BaseModel):
         from_attributes = True
 
 # ==================================
-# ### PERUBAHAN DIMULAI DI SINI ###
 # SKEMA UNTUK HASIL ANALISIS
 # ==================================
 
-# Skema diubah agar cocok dengan output baru dari logic.py
 class AnalysisBigFive(BaseModel):
     PERSONALITY: str
     SCORE: float
     BRIEF_EXPLANATION: str
-    # engagement, excitement, interest dihapus
 
-# Skema ini masih menggunakan struktur lama karena Bagian 3 belum diimplementasi
+# Kolom lama engagement/excitement/interest dihapus, sesuai rumus baru
 class AnalysisCognitive(BaseModel):
-    TEST: str
-    ENGAGEMENT: float
-    EXCITEMENT: float
-    INTEREST: float
+    TEST: str  # IKN, IWM, atau ISTM
     SCORE: float
 
-# Skema ini tidak lagi menjadi bagian dari respons utama, jadi tidak perlu diubah
-# Namun, akan dihapus dari AnalysisResult
 class AnalysisSplitBrain(BaseModel):
     TEST: str
     LEFT_HEMISPHERE: float
@@ -106,27 +100,22 @@ class AnalysisPersonalityAccuracy(BaseModel):
     AF4: float
     AVERAGE: float
 
-# Skema diubah agar cocok dengan output baru dari logic.py
 class AnalysisResponse(BaseModel):
     CATEGORY: str
-    # Kolom disesuaikan dengan perubahan DB dan logic.py
     ENGAGEMENT: float
     INTEREST: float
     FOCUS: float
     RELAXATION: float
     ATTENTION: float
-    # stress dan relax dihapus
 
-# Skema diubah untuk menghapus field yang sudah tidak ada
 class AnalysisResult(BaseModel):
     big_five: List[AnalysisBigFive]
-    cognitive_function: List[AnalysisCognitive]
+    cognitive_function: List[AnalysisCognitive]  # format baru
     response_during_test: List[AnalysisResponse]
     topoplot_urls: dict[str, str]
     roc_curve_urls: dict[str, str]
     long_report_url: Optional[str] = None
     short_report_url: Optional[str] = None
-    # split_brain dan personality_accuracy dihapus dari sini
 
 class FilePathPayload(BaseModel):
     file_path: str = Field(..., description="Path ke file CSV yang dihasilkan")

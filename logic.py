@@ -6,7 +6,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import mysql.connector
-from config import settings # Pastikan config diimpor
+from config import settings  # Pastikan config diimpor
 
 # ==================================
 # 1. PERSIAPAN DATA (Tidak ada perubahan)
@@ -52,6 +52,59 @@ SESSION_DEFINITIONS = {
     'DIGIT SPAN': (600, 660)
 }
 
+# -----------------------
+# Helper: robust POW column finder
+# -----------------------
+def find_pow_col(df: pd.DataFrame, channel: str, band: str):
+    """
+    Cari kolom POW yang sesuai, mencoba beberapa varian nama:
+      - POW.<channel>.<band>
+      - POW.EEG.<channel>.<band>
+      - POW.<channel>_<band>
+      - POW_<channel>_<band>
+      - <channel>.<band>
+      - <channel>_<band>
+    Case-insensitive fallback juga dicoba.
+    Jika tidak ditemukan, return None.
+    """
+    candidates = [
+        f"POW.{channel}.{band}",
+        f"POW.EEG.{channel}.{band}",
+        f"POW.{channel}_{band}",
+        f"POW_{channel}_{band}",
+        f"{channel}.{band}",
+        f"{channel}_{band}"
+    ]
+
+    # direct match (case-sensitive)
+    for c in candidates:
+        if c in df.columns:
+            return c
+
+    # try case-insensitive
+    cols_lower = {col.lower(): col for col in df.columns}
+    for c in candidates:
+        if c.lower() in cols_lower:
+            return cols_lower[c.lower()]
+
+    return None
+
+def safe_col_mean(session_df: pd.DataFrame, channel: str, band: str):
+    """
+    Ambil mean dari kolom POW untuk channel+band yang ada,
+    jika tidak ada, return np.nan
+    """
+    col = find_pow_col(session_df, channel, band)
+    if col is None:
+        return np.nan
+    vals = session_df[col].dropna().values
+    if len(vals) == 0:
+        return np.nan
+    return float(np.mean(vals))
+
+# -----------------------
+# Big Five (tetap)
+# -----------------------
 def analyze_big_five(all_aucs):
     traits = ['OPENESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM']
     results = []
@@ -72,26 +125,97 @@ def analyze_big_five(all_aucs):
             })
     return results
 
-def analyze_cognitive_function(csv_path="cleaning.csv"):
+# -----------------------
+# Cognitive function (DIUBAH sesuai permintaan)
+# -----------------------
+def analyze_cognitive_function(csv_path="cleaning2.csv"):
+    """
+    Hitung skor cognitive traits berdasarkan rumus baru:
+    - IKN  = (Beta(AF3) + Beta(AF4)) / (Alpha(AF3) + Alpha(AF4) + ε)
+    - IWM  = (Theta(AF3) + Theta(AF4) + Gamma(AF3) + Gamma(AF4)) / (Alpha(AF3) + Alpha(AF4) + ε)
+    - ISTM = (Theta(AF3) + Theta(AF4) + Theta(T7) + Theta(T8)) / (Alpha(AF3) + Alpha(AF4) + ε)
+
+    Membaca cleaning2.csv yang berisi kolom POW.*.
+    Epsilon = 0.01
+    """
+    epsilon = 0.01
     df = pd.read_csv(csv_path)
-    tests = ['KRAEPELIN TEST', 'WCST', 'DIGIT SPAN']
+
     results = []
-    for test in tests:
-        start_time, end_time = SESSION_DEFINITIONS[test]
-        session_df = df[(df['time'] >= start_time) & (df['time'] < end_time)]
-        if not session_df.empty:
-            engagement = session_df['PM.Engagement'].mean()
-            excitement = session_df['PM.Excitement'].mean()
-            interest = session_df['PM.Interest'].mean()
-            score = np.mean([engagement, excitement, interest])
-            results.append({
-                "TEST": test,
-                "ENGAGEMENT": engagement,
-                "EXCITEMENT": excitement,
-                "INTEREST": interest,
-                "SCORE": score,
-            })
+
+    # ====== KRAEPELIN TEST → IKN ======
+    start_time, end_time = SESSION_DEFINITIONS['KRAEPELIN TEST']
+    session_df = df[(df['time'] >= start_time) & (df['time'] < end_time)]
+    if not session_df.empty:
+        af3_beta = safe_col_mean(session_df, "AF3", "Beta")
+        af4_beta = safe_col_mean(session_df, "AF4", "Beta")
+        af3_alpha = safe_col_mean(session_df, "AF3", "Alpha")
+        af4_alpha = safe_col_mean(session_df, "AF4", "Alpha")
+
+        beta_sum = np.nansum([af3_beta, af4_beta])
+        alpha_sum = np.nansum([af3_alpha, af4_alpha])
+
+        # compute score; if numerator NaN => None
+        if np.isnan(beta_sum):
+            score_val = None
+        else:
+            score_val = float(beta_sum / (alpha_sum + epsilon))
+
+        results.append({
+            "TEST": "KRAEPELIN TEST",
+            "SCORE": score_val
+        })
+
+    # ====== WCST → IWM ======
+    start_time, end_time = SESSION_DEFINITIONS['WCST']
+    session_df = df[(df['time'] >= start_time) & (df['time'] < end_time)]
+    if not session_df.empty:
+        af3_theta = safe_col_mean(session_df, "AF3", "Theta")
+        af4_theta = safe_col_mean(session_df, "AF4", "Theta")
+        af3_gamma = safe_col_mean(session_df, "AF3", "Gamma")
+        af4_gamma = safe_col_mean(session_df, "AF4", "Gamma")
+        af3_alpha = safe_col_mean(session_df, "AF3", "Alpha")
+        af4_alpha = safe_col_mean(session_df, "AF4", "Alpha")
+
+        numerator = np.nansum([af3_theta, af4_theta, af3_gamma, af4_gamma])
+        denominator = np.nansum([af3_alpha, af4_alpha])
+
+        if np.isnan(numerator):
+            score_val = None
+        else:
+            score_val = float(numerator / (denominator + epsilon))
+
+        results.append({
+            "TEST": "WCST",
+            "SCORE": score_val
+        })
+
+    # ====== DIGIT SPAN → ISTM ======
+    start_time, end_time = SESSION_DEFINITIONS['DIGIT SPAN']
+    session_df = df[(df['time'] >= start_time) & (df['time'] < end_time)]
+    if not session_df.empty:
+        af3_theta = safe_col_mean(session_df, "AF3", "Theta")
+        af4_theta = safe_col_mean(session_df, "AF4", "Theta")
+        t7_theta = safe_col_mean(session_df, "T7", "Theta")
+        t8_theta = safe_col_mean(session_df, "T8", "Theta")
+        af3_alpha = safe_col_mean(session_df, "AF3", "Alpha")
+        af4_alpha = safe_col_mean(session_df, "AF4", "Alpha")
+
+        numerator = np.nansum([af3_theta, af4_theta, t7_theta, t8_theta])
+        denominator = np.nansum([af3_alpha, af4_alpha])
+
+        if np.isnan(numerator):
+            score_val = None
+        else:
+            score_val = float(numerator / (denominator + epsilon))
+
+        results.append({
+            "TEST": "DIGIT SPAN",
+            "SCORE": score_val
+        })
+
     return results
+
 
 # ### PERUBAHAN DIMULAI DI SINI ###
 def analyze_response_during_test(csv_path="cleaning.csv"):
@@ -121,10 +245,9 @@ def analyze_response_during_test(csv_path="cleaning.csv"):
     return results
 
 # ==================================
-# 3. FUNGSI VISUALISASI (Tidak ada perubahan)
+# 3. FUNGSI VISUALISASI (Diperbarui agar tahan terhadap variasi nama POW)
 # ==================================
 def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/topoplots", username="default"):
-    # ... (kode di sini tidak berubah)
     os.makedirs(output_dir, exist_ok=True)
     df = pd.read_csv(cleaning2_path)
 
@@ -135,45 +258,65 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
 
     sessions_to_plot = {k: v for k, v in SESSION_DEFINITIONS.items() if k not in ['OPEN EYES', 'CLOSED EYES', 'AUTOBIOGRAPHY']}
 
-    bands_map = {
-        'Theta': [col for col in df.columns if 'Theta' in col],
-        'Alpha': [col for col in df.columns if 'Alpha' in col],
-        'Beta': [col for col in df.columns if '.Beta' in col and 'BetaH' not in col],
-        'High Beta': [col for col in df.columns if 'BetaH' in col],
-        'Gamma': [col for col in df.columns if 'Gamma' in col]
-    }
+    band_list = [
+        ("Theta", "Theta"),
+        ("Alpha", "Alpha"),
+        ("Beta", "Beta"),
+        ("High Beta", "BetaH"),
+        ("Gamma", "Gamma")
+    ]
 
     for session_name, (start_time, end_time) in sessions_to_plot.items():
         session_df = df[(df['time'] >= start_time) & (df['time'] < end_time)]
         if session_df.empty:
             continue
 
-        fig, axes = plt.subplots(1, 5, figsize=(25, 6))
+        fig, axes = plt.subplots(1, len(band_list), figsize=(5 * len(band_list), 6))
 
-        for i, (band_name, band_cols) in enumerate(bands_map.items()):
+        for i, (band_title, band_code) in enumerate(band_list):
             ax = axes[i]
-            avg_values = session_df[band_cols].mean().values
-            
-            vmin = np.min(avg_values)
-            vmax = np.max(avg_values)
-            if vmin == vmax:
-                vmin -= 1e-9 
-                vmax += 1e-9
+            # buat list kolom sesuai urutan ch_names
+            band_cols = []
+            for ch in ch_names:
+                col = find_pow_col(session_df, ch, band_code)
+                band_cols.append(col)
 
-            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, cmap='jet', names=ch_names)
-            
+            # ambil rata-rata tiap channel (keeping order)
+            avg_values = []
+            for col in band_cols:
+                if col is None:
+                    avg_values.append(np.nan)
+                else:
+                    vals = session_df[col].dropna().values
+                    avg_values.append(float(np.mean(vals)) if len(vals) > 0 else np.nan)
+
+            avg_values = np.array(avg_values, dtype=float)
+
+            # handle case semua nan
+            if np.all(np.isnan(avg_values)):
+                # isi dengan zeros supaya plot tidak crash, tapi beri peringatan
+                avg_values = np.zeros(len(ch_names))
+                vmin = 0.0
+                vmax = 0.0
+            else:
+                vmin = np.nanmin(avg_values)
+                vmax = np.nanmax(avg_values)
+                if vmin == vmax:
+                    vmin -= 1e-9
+                    vmax += 1e-9
+
+            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, names=ch_names)
+            im.set_clim(vmin, vmax)
+
             for text in ax.texts:
                 if text.get_text() in ch_names:
                     text.set_fontweight('bold')
-                    text.set_fontsize(16)
+                    text.set_fontsize(12)
 
-            im.set_clim(vmin, vmax)
-            
             cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.8)
-            cbar.set_label('Power ($\mu V^2$)', fontsize=14, fontweight='bold')
-            cbar.ax.tick_params(labelsize=12)
-            
-            ax.set_title(band_name, fontsize=12, fontweight='bold')
+            cbar.set_label('Power ($\\mu V^2$)', fontsize=10)
+            cbar.ax.tick_params(labelsize=10)
+            ax.set_title(band_title, fontsize=12, fontweight='bold')
 
         fig.suptitle(f'Topoplot Aktivitas Otak: {session_name}', fontsize=16, y=0.98, fontweight='bold')
         plt.tight_layout(rect=[0, 0.05, 1, 0.95])
@@ -184,10 +327,9 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
         plt.close(fig)
 
 def generate_roc_curves(cleaning2_path="cleaning2.csv", output_dir="static/roc_curves", username="default"):
-    # ... (kode di sini tidak berubah)
     os.makedirs(output_dir, exist_ok=True)
     df = pd.read_csv(cleaning2_path)
-    
+
     channels = ['AF3', 'T7', 'Pz', 'T8', 'AF4']
     bands_map = {
         'Theta': 'Theta',
@@ -200,25 +342,25 @@ def generate_roc_curves(cleaning2_path="cleaning2.csv", output_dir="static/roc_c
     df_baseline = df[(df['time'] >= baseline_start) & (df['time'] < baseline_end)]
 
     task_sessions_names = ['OPENESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM', 'KRAEPELIN TEST', 'WCST', 'DIGIT SPAN']
-    
+
     roc_results = []
     all_aucs = {session: [] for session in task_sessions_names}
 
     for channel in channels:
         for band_key, band_name in bands_map.items():
-            col_name = f"POW.{channel}.{band_name}"
-            if col_name not in df.columns:
-                continue
+            col_name = find_pow_col(df, channel, band_name)
+            if col_name is None:
+                continue  # tidak ada kolom untuk kombinasi ini
 
             plt.figure(figsize=(10, 8))
-            
+
             for session_name in task_sessions_names:
                 task_start, task_end = SESSION_DEFINITIONS[session_name]
                 df_task_single = df[(df['time'] >= task_start) & (df['time'] < task_end)]
 
                 baseline_scores = df_baseline[col_name].dropna().values
                 task_scores = df_task_single[col_name].dropna().values
-                
+
                 if len(baseline_scores) == 0 or len(task_scores) == 0:
                     continue
 
@@ -226,7 +368,11 @@ def generate_roc_curves(cleaning2_path="cleaning2.csv", output_dir="static/roc_c
                 y_true = np.concatenate([np.zeros(len(baseline_scores)), np.ones(len(task_scores))])
 
                 min_score, max_score = np.min(y_scores), np.max(y_scores)
-                thresholds = np.linspace(min_score, max_score, 200)
+                if min_score == max_score:
+                    # degenerate case: buat sedikit range
+                    thresholds = np.array([min_score - 1e-6, min_score, min_score + 1e-6])
+                else:
+                    thresholds = np.linspace(min_score, max_score, 200)
 
                 tpr_list, fpr_list = [], []
 
@@ -236,12 +382,12 @@ def generate_roc_curves(cleaning2_path="cleaning2.csv", output_dir="static/roc_c
                     fp = np.sum((y_true == 0) & (y_pred == 1))
                     tn = np.sum((y_true == 0) & (y_pred == 0))
                     fn = np.sum((y_true == 1) & (y_pred == 0))
-                    
+
                     tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
                     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
                     tpr_list.append(tpr)
                     fpr_list.append(fpr)
-                
+
                 auc = np.trapz(tpr_list, fpr_list)
                 all_aucs[session_name].append(auc)
                 plt.plot(fpr_list, tpr_list, lw=2.5, label=f'{session_name} (AUC = {auc:.2f})', solid_joinstyle='round')
@@ -254,32 +400,33 @@ def generate_roc_curves(cleaning2_path="cleaning2.csv", output_dir="static/roc_c
             plt.title(f'ROC: {band_key} on {channel} (Baseline vs Tasks)', fontsize=14, fontweight='bold')
             plt.legend(loc="lower right", fontsize='small')
             plt.grid(alpha=0.4)
-            
+
             filename = f"{username}_roc_{channel}_{band_key.lower()}.png"
             output_file = os.path.join(output_dir, filename)
             plt.savefig(output_file, dpi=120)
             plt.close()
-            
+
             note = f"ROC Curves for {band_key} on {channel}, comparing Baseline (Autobiography) vs 8 individual Task Sessions."
             roc_results.append({"graph": output_file, "note": note})
-            
+
     return roc_results, all_aucs
 
 # ======================
-# 4. RUN ANALYSIS UTAMA (Tidak ada perubahan)
+# 4. RUN ANALYSIS UTAMA (DISesuaikan membaca cleaning2 untuk cognitive)
 # ======================
 def run_full_analysis(path: str, user_id: int, username: str):
     create_cleaning_csv(path)
     create_cleaning2_csv(path)
 
-    cognitive = analyze_cognitive_function("cleaning.csv")
+    # Perubahan: cognitive harus baca cleaning2.csv (POW)
+    cognitive = analyze_cognitive_function("cleaning2.csv")
     response = analyze_response_during_test("cleaning.csv")
 
     generate_all_topoplots("cleaning2.csv", username=username)
     roc_results, all_aucs = generate_roc_curves("cleaning2.csv", username=username)
-    
+
     big_five = analyze_big_five(all_aucs)
-    
+
     topoplot_sessions = ['KRAEPELIN_TEST', 'WCST', 'DIGIT_SPAN', 'OPENESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM']
     topoplot_urls = {
         s.upper(): f"{settings.BASE_URL}/static/topoplots/{username}_topoplot_{s.lower().replace(' ', '_')}.png"
@@ -289,7 +436,7 @@ def run_full_analysis(path: str, user_id: int, username: str):
         os.path.basename(res['graph']).replace('.png', ''): f"{settings.BASE_URL}/{res['graph']}"
         for res in roc_results
     }
-    
+
     result = {
         "big_five": big_five,
         "cognitive_function": cognitive,
