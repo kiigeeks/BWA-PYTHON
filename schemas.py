@@ -1,3 +1,5 @@
+# filename: schemas.py
+
 from pydantic import BaseModel, Field
 from typing import Optional, List, TypeVar, Generic
 import datetime
@@ -14,43 +16,25 @@ class TokenPayload(BaseModel):
 
 # ==================================
 # SKEMA UNTUK DATA RELASI (NESTED)
+# (Tidak ada perubahan di bagian ini)
 # ==================================
 
 class UserPersonality(BaseModel):
-    engagement: Optional[float] = None
-    excitement: Optional[float] = None
-    interest: Optional[float] = None
     score: Optional[float] = None
     brain_topography: Optional[str] = None
-    class Config: from_attributes = True
-
-class UserPersonalityAccuracy(BaseModel):
-    AF3: Optional[float] = None
-    T7: Optional[float] = None
-    Pz: Optional[float] = None
-    T8: Optional[float] = None
-    AF4: Optional[float] = None
-    average: Optional[float] = None
     class Config: from_attributes = True
 
 class UserCognitive(BaseModel):
-    engagement: Optional[float] = None
-    excitement: Optional[float] = None
-    interest: Optional[float] = None
     score: Optional[float] = None
     brain_topography: Optional[str] = None
     class Config: from_attributes = True
 
-class UserSplitBrain(BaseModel):
-    left: Optional[float] = None
-    right: Optional[float] = None
-    class Config: from_attributes = True
-
 class UserResponse(BaseModel):
-    attention: Optional[float] = None
-    stress: Optional[float] = None
-    relax: Optional[float] = None
+    engagement: Optional[float] = None
+    interest: Optional[float] = None
     focus: Optional[float] = None
+    relaxation: Optional[float] = None
+    attention: Optional[float] = None
     class Config: from_attributes = True
 
 class ROCCurve(BaseModel):
@@ -60,6 +44,7 @@ class ROCCurve(BaseModel):
 
 # ==================================
 # SKEMA UTAMA USER (DENGAN RELASI)
+# (Tidak ada perubahan di bagian ini)
 # ==================================
 
 class User(BaseModel):
@@ -73,17 +58,12 @@ class User(BaseModel):
     test_date: Optional[datetime.date] = None
     test_location: Optional[str] = None
     roles: Optional[str] = None
-    conclusions: Optional[str] = None
-    report: Optional[str] = None
     jobs: Optional[str] = None
-    note_jobs: Optional[str] = None
     laporan_panjang: Optional[str] = None
     laporan_pendek: Optional[str] = None
 
     personalities_data: List[UserPersonality] = []
-    personality_accuracies: List[UserPersonalityAccuracy] = []
     cognitive_data: List[UserCognitive] = []
-    split_brain_data: List[UserSplitBrain] = []
     response_data: List[UserResponse] = []
     roc_curves: List[ROCCurve] = []
 
@@ -91,16 +71,18 @@ class User(BaseModel):
         from_attributes = True
 
 # ==================================
+# ### PERUBAHAN DIMULAI DI SINI ###
 # SKEMA UNTUK HASIL ANALISIS
 # ==================================
+
+# Skema diubah agar cocok dengan output baru dari logic.py
 class AnalysisBigFive(BaseModel):
     PERSONALITY: str
-    ENGAGEMENT: float
-    EXCITEMENT: float
-    INTEREST: float
     SCORE: float
     BRIEF_EXPLANATION: str
+    # engagement, excitement, interest dihapus
 
+# Skema ini masih menggunakan struktur lama karena Bagian 3 belum diimplementasi
 class AnalysisCognitive(BaseModel):
     TEST: str
     ENGAGEMENT: float
@@ -108,6 +90,8 @@ class AnalysisCognitive(BaseModel):
     INTEREST: float
     SCORE: float
 
+# Skema ini tidak lagi menjadi bagian dari respons utama, jadi tidak perlu diubah
+# Namun, akan dihapus dari AnalysisResult
 class AnalysisSplitBrain(BaseModel):
     TEST: str
     LEFT_HEMISPHERE: float
@@ -122,23 +106,27 @@ class AnalysisPersonalityAccuracy(BaseModel):
     AF4: float
     AVERAGE: float
 
+# Skema diubah agar cocok dengan output baru dari logic.py
 class AnalysisResponse(BaseModel):
     CATEGORY: str
-    ATTENTION: float
-    STRESS: float
-    RELAX: float
+    # Kolom disesuaikan dengan perubahan DB dan logic.py
+    ENGAGEMENT: float
+    INTEREST: float
     FOCUS: float
+    RELAXATION: float
+    ATTENTION: float
+    # stress dan relax dihapus
 
+# Skema diubah untuk menghapus field yang sudah tidak ada
 class AnalysisResult(BaseModel):
     big_five: List[AnalysisBigFive]
     cognitive_function: List[AnalysisCognitive]
-    split_brain: List[AnalysisSplitBrain]
-    personality_accuracy: List[AnalysisPersonalityAccuracy]
     response_during_test: List[AnalysisResponse]
     topoplot_urls: dict[str, str]
     roc_curve_urls: dict[str, str]
     long_report_url: Optional[str] = None
     short_report_url: Optional[str] = None
+    # split_brain dan personality_accuracy dihapus dari sini
 
 class FilePathPayload(BaseModel):
     file_path: str = Field(..., description="Path ke file CSV yang dihasilkan")
