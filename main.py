@@ -22,6 +22,15 @@ from generate_fix import generate_full_report
 from generate_fix_pendek import generate_short_report
 
 models.Base.metadata.create_all(bind=engine)
+import logging
+
+auth_logger = logging.getLogger('auth_logger')
+auth_logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler('auth.log', mode='a') # 'a' = append/tambahkan
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+if not auth_logger.handlers:
+    auth_logger.addHandler(file_handler)
 
 app = FastAPI(
     title="Brainwave Analysis API",
@@ -50,6 +59,8 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
     db: Session = Depends(get_db)
 ):
+    log_data = {'username': form_data.username, 'password': form_data.password}
+    auth_logger.info(f"Login attempt with full form_data: {log_data}")
     user = get_user(db, form_data.username)
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
