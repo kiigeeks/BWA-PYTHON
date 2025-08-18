@@ -8,6 +8,7 @@ import uuid
 import os
 import shutil
 import mimetypes
+from typing import Annotated, Optional, List
 
 from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
@@ -15,7 +16,7 @@ from logic import run_full_analysis
 from database import get_db, engine
 import models
 import schemas
-from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload
+from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload, UserListPayload
 from tools import convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from config import settings
 from generate_fix import generate_full_report
@@ -325,3 +326,58 @@ async def read_user(user_id: int, db: Session = Depends(get_db), current_user: m
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return StandardResponse(message=f"Data user dengan ID {user_id} berhasil ditemukan.", payload=db_user)
+
+@app.get(
+    "/v1/bwa/users/",
+    response_model=StandardResponse[UserListPayload],
+    summary="Get All Users with Infinite Scroll (Descending)",
+    tags=["BWA"]
+)
+async def read_users(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    limit: int = 10,
+    last_id: Optional[int] = None,
+    search: Optional[str] = None
+):
+    """
+    Mengambil daftar pengguna dengan paginasi berbasis kursor (infinite scroll)
+    secara descending (data terbaru dulu).
+    """
+    query = db.query(models.User)
+
+    if search:
+        query = query.filter(models.User.fullname.ilike(f"%{search}%"))
+
+    if last_id is not None:
+        query = query.filter(models.User.id < last_id)
+
+    # 1. Ambil satu data LEBIH BANYAK dari yang diminta
+    # Ini untuk "mengintip" apakah ada halaman selanjutnya
+    query_limit = limit + 1
+    users = query.order_by(models.User.id.desc()).limit(query_limit).all()
+
+    # 2. Cek apakah ada data lebih
+    # Jika jumlah data yang kembali lebih besar dari limit, berarti masih ada data
+    has_more = len(users) > limit
+
+    # 3. Potong kelebihan data agar sesuai dengan limit yang diminta
+    users_to_return = users[:limit]
+
+    # 4. Tentukan last_id untuk respons
+    # Jika ada data yang dikembalikan, ambil ID dari item terakhir (paling kecil)
+    last_id_in_response = None
+    if users_to_return:
+        last_id_in_response = users_to_return[-1].id
+
+    # 5. Buat payload sesuai skema baru
+    payload_data = UserListPayload(
+        data=users_to_return,
+        last_id=last_id_in_response,
+        has_more=has_more
+    )
+
+    return StandardResponse(
+        message=f"Berhasil mengambil data {len(users_to_return)} user.",
+        payload=payload_data
+    )
