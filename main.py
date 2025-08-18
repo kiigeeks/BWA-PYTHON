@@ -315,9 +315,9 @@ async def download_file(filepath: str):
 async def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_user = db.query(models.User).options(
         joinedload(models.User.personalities_data), 
-        joinedload(models.User.personality_accuracies), 
+        # joinedload(models.User.personality_accuracies), 
         joinedload(models.User.cognitive_data), 
-        joinedload(models.User.split_brain_data), 
+        # joinedload(models.User.split_brain_data), 
         joinedload(models.User.response_data),
         joinedload(models.User.roc_curves)
     ).filter(models.User.id == user_id).first()
