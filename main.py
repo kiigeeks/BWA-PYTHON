@@ -313,7 +313,7 @@ async def download_file(filepath: str):
     )
 
 @app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["BWA"])
-async def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+async def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = db.query(models.User).options(
         joinedload(models.User.personalities_data), 
         # joinedload(models.User.personality_accuracies), 
@@ -322,17 +322,12 @@ async def read_user(user_id: int, db: Session = Depends(get_db), current_user: m
         joinedload(models.User.response_data),
         joinedload(models.User.roc_curves)
     ).filter(models.User.id == user_id).first()
-    
+
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return StandardResponse(message=f"Data user dengan ID {user_id} berhasil ditemukan.", payload=db_user)
 
-@app.get(
-    "/v1/bwa/users/",
-    response_model=StandardResponse[UserListPayload],
-    summary="Get All Users with Infinite Scroll (Descending)",
-    tags=["BWA"]
-)
+@app.get("/v1/bwa/users/",response_model=StandardResponse[UserListPayload],summary="Get All Users with Infinite Scroll (Descending)",tags=["BWA"])
 async def read_users(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
@@ -342,41 +337,35 @@ async def read_users(
 ):
     """
     Mengambil daftar pengguna dengan paginasi berbasis kursor (infinite scroll)
-    secara descending (data terbaru dulu).
+    secara descending (data terbaru dulu). Endpoint ini hanya akan
+    mengembalikan pengguna dengan peran 'user'.
     """
     query = db.query(models.User)
-
+    
+    query = query.filter(models.User.roles == 'user')
+    
     if search:
         query = query.filter(models.User.fullname.ilike(f"%{search}%"))
-
+        
     if last_id is not None:
         query = query.filter(models.User.id < last_id)
-
-    # 1. Ambil satu data LEBIH BANYAK dari yang diminta
-    # Ini untuk "mengintip" apakah ada halaman selanjutnya
+        
     query_limit = limit + 1
     users = query.order_by(models.User.id.desc()).limit(query_limit).all()
-
-    # 2. Cek apakah ada data lebih
-    # Jika jumlah data yang kembali lebih besar dari limit, berarti masih ada data
+    
     has_more = len(users) > limit
-
-    # 3. Potong kelebihan data agar sesuai dengan limit yang diminta
     users_to_return = users[:limit]
-
-    # 4. Tentukan last_id untuk respons
-    # Jika ada data yang dikembalikan, ambil ID dari item terakhir (paling kecil)
+    
     last_id_in_response = None
     if users_to_return:
         last_id_in_response = users_to_return[-1].id
-
-    # 5. Buat payload sesuai skema baru
+        
     payload_data = UserListPayload(
         data=users_to_return,
         last_id=last_id_in_response,
         has_more=has_more
     )
-
+    
     return StandardResponse(
         message=f"Berhasil mengambil data {len(users_to_return)} user.",
         payload=payload_data
