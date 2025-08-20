@@ -305,7 +305,7 @@ def generate_all_topoplots(cleaning2_path="cleaning2.csv", output_dir="static/to
                     vmin -= 1e-9
                     vmax += 1e-9
 
-            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, names=ch_names)
+            im, _ = mne.viz.plot_topomap(avg_values, info, axes=ax, show=False, names=ch_names, cmap='jet')
             im.set_clim(vmin, vmax)
 
             for text in ax.texts:
