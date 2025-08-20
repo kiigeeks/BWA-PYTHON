@@ -459,12 +459,10 @@ def save_to_mysql(results, user_id, username):
     )
     cursor = db.cursor()
 
-    # --- PERUBAHAN 1: Buat fungsi helper untuk membersihkan data ---
-    def clean_nan_inf(value):
-        """Mengubah nilai NaN atau Infinity menjadi None (NULL di DB)."""
-        if value is None or np.isnan(value) or np.isinf(value):
+    def clean_nan(value):
+        if isinstance(value, float) and np.isnan(value):
             return None
-        return float(value)
+        return value
 
     personality_ids = {
         'OPENESS': 1, 'CONSCIENTIOUSNESS': 2, 'EXTRAVERSION': 3,
@@ -479,44 +477,44 @@ def save_to_mysql(results, user_id, username):
         'NEUROTICISM': 8, 'KRAEPELIN TEST': 9, 'WCST': 10, 'DIGIT SPAN': 11
     }
 
-    # Loop untuk 'big_five' (tidak berubah)
+    # Loop untuk 'big_five' (Sudah sesuai dari perubahan sebelumnya)
     for row in results['big_five']:
         personality_id = personality_ids.get(row['PERSONALITY'].upper())
         if not personality_id: continue
         cursor.execute(
             "INSERT INTO user_personalities (user_id, personality_id, score, brain_topography) VALUES (%s, %s, %s, %s)",
-            (user_id, personality_id, clean_nan_inf(row['SCORE']), f"{username}_topoplot_{row['PERSONALITY'].lower()}.png")
+            (user_id, personality_id, clean_nan(row['SCORE']), f"{username}_topoplot_{row['PERSONALITY'].lower()}.png")
         )
 
-    # Loop untuk 'cognitive_function' (tidak berubah)
+    # Loop untuk 'cognitive_function' (Sudah sesuai dari perubahan sebelumnya)
     for row in results['cognitive_function']:
         test_id = test_ids.get(row['TEST'].upper())
         if not test_id: continue
         cursor.execute(
             "INSERT INTO user_cognitive (user_id, test_id, score, brain_topography) VALUES (%s, %s, %s, %s)",
-            (user_id, test_id, clean_nan_inf(row['SCORE']), f"{username}_topoplot_{row['TEST'].lower().replace(' ', '_')}.png")
+            (user_id, test_id, clean_nan(row['SCORE']), f"{username}_topoplot_{row['TEST'].lower().replace(' ', '_')}.png")
         )
 
+    # ### PERUBAHAN DI SINI ###
     # Loop untuk 'response_during_test'
     for row in results['response_during_test']:
         stimulation_id = stimulation_ids.get(row['CATEGORY'].upper())
         if not stimulation_id: continue
-        
-        # --- PERUBAHAN 2: Gunakan fungsi clean_nan_inf pada setiap nilai ---
+        # Query diubah agar sesuai dengan kolom tabel 'user_response' yang baru
         cursor.execute(
             "INSERT INTO user_response (user_id, stimulation_id, engagement, interest, focus, relaxation, attention) VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (
                 user_id,
                 stimulation_id,
-                clean_nan_inf(row.get('ENGAGEMENT')),
-                clean_nan_inf(row.get('INTEREST')),
-                clean_nan_inf(row.get('FOCUS')),
-                clean_nan_inf(row.get('RELAXATION')), # Ini akan memperbaiki error Anda
-                clean_nan_inf(row.get('ATTENTION'))
+                clean_nan(row.get('ENGAGEMENT')),  # Menggunakan .get() untuk keamanan
+                clean_nan(row.get('INTEREST')),
+                clean_nan(row.get('FOCUS')),
+                clean_nan(row.get('RELAXATION')),
+                clean_nan(row.get('ATTENTION'))
             )
         )
 
-    # Loop untuk 'roc_curves' (tidak berubah)
+    # Loop untuk 'roc_curves' (Tidak ada perubahan)
     if 'roc_results_db' in results:
         for row in results['roc_results_db']:
             graph_path = row['graph'].replace('\\', '/')
