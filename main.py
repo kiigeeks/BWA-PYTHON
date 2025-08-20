@@ -9,7 +9,6 @@ import os
 import shutil
 import mimetypes
 import logging # <-- Perubahan 1: Impor modul logging
-from datetime import date
 
 from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
@@ -95,7 +94,7 @@ async def analyze_edf(
     gender: str = Form(...), 
     age: int = Form(...), 
     address: str = Form(...), 
-    test_date: date = Form(...), 
+    test_date: str = Form(...), 
     test_location: str = Form(...),
     pekerjaan: Optional[str] = Form(None),
     operator_name: str = Form(...)
