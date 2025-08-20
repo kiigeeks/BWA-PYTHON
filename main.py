@@ -201,7 +201,7 @@ async def analyze_edf(
             analysis_logger.info(f"   -> Memanggil generate_full_report untuk {nama_file_output_panjang}")
             person_job_fit_text = generate_full_report(
                 tipe_kepribadian=tipe_kepribadian_tertinggi, kognitif_utama_key=kognitif_utama_key, pekerjaan=pekerjaan,
-                model_ai="llama3.1:8b", nama_file_output=nama_file_output_panjang, biodata_kandidat=biodata_kandidat,
+                model_ai="deepseek-r1:1.5b", nama_file_output=nama_file_output_panjang, biodata_kandidat=biodata_kandidat,
                 topoplot_path_behaviour=topoplot_path_behavior, topoplot_path_cognitive=topoplot_path_cognitive
             )
             
@@ -231,7 +231,7 @@ async def analyze_edf(
             analysis_logger.info(f"   -> Memanggil generate_short_report untuk {nama_file_output_pendek}")
             generate_short_report(
                 tipe_kepribadian=tipe_kepribadian_tertinggi, kognitif_utama_key=kognitif_utama_key, pekerjaan=pekerjaan,
-                model_ai="llama3.1:8b", nama_file_output=nama_file_output_pendek, biodata_kandidat=biodata_kandidat,
+                model_ai="deepseek-r1:1.5b", nama_file_output=nama_file_output_pendek, biodata_kandidat=biodata_kandidat,
                 topoplot_path_behaviour=topoplot_path_behavior, topoplot_path_cognitive=topoplot_path_cognitive,
                 personality_title=personality_details.title, personality_desc=personality_details.description,
                 cognitive_title=cognitive_details.title, cognitive_desc=cognitive_details.description,
