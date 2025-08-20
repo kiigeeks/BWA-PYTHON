@@ -43,6 +43,13 @@ def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
             print(f"   -- Berhasil meng-generate '{task_name}'.")
             return generated_text
         return f"Error: HTTP {response.status_code} - {response.text}"
+        
+    # PERUBAHAN DI SINI: Tambahkan blok except khusus untuk Timeout
+    except requests.exceptions.Timeout:
+        # Pesan ini akan muncul di log server Anda
+        print(f"!!! TIMEOUT: Tugas '{task_name}' melebihi batas waktu 600 detik saat menghubungi Ollama.")
+        return f"Error: Permintaan ke model AI timeout setelah 600 detik."
+
     except requests.exceptions.ConnectionError:
         return "Error: Tidak bisa connect ke Ollama server."
     except Exception as e:
