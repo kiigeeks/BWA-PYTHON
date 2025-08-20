@@ -290,7 +290,7 @@ def extract_relevant_data(full_text, keywords):
     return "\n\n".join(extracted_chunks)
 
 
-def generate_ai_content(prompt, model="deepseek-r1:1.5b", task_name="AI Task"):
+def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
     """
     Fungsi generik untuk berinteraksi dengan model AI Ollama.
     Versi ini memiliki pembersih otomatis untuk menghapus kalimat pembuka yang tidak diinginkan.
@@ -796,7 +796,7 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
         tipe_kepribadian (str): Nama trait kepribadian utama (e.g., "Openness").
         kognitif_utama_key (str): Kunci untuk trait kognitif utama (e.g., "WCST (Logika)").
         pekerjaan (str): Nama pekerjaan yang dilamar (e.g., "Tax Accountant").
-        model_ai (str): Nama model Ollama yang akan digunakan (e.g., "deepseek-r1:1.5b").
+        model_ai (str): Nama model Ollama yang akan digunakan (e.g., "llama3.1:8b").
         nama_file_output (str): Path untuk menyimpan file PDF hasil.
         biodata_kandidat (dict): Dictionary berisi biodata kandidat.
     """
@@ -1098,7 +1098,7 @@ if __name__ == "__main__":
     config_tipe_kepribadian = "Openness"
     config_kognitif_utama = "WCST (Logika)" 
     config_pekerjaan = "Tax Accountant"
-    config_model_ai = "deepseek-r1:1.5b"
+    config_model_ai = "llama3.1:8b"
     config_nama_file = "laporan_profiling_lengkap.pdf"
     
     config_biodata = {

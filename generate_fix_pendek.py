@@ -25,7 +25,7 @@ def markdown_to_html_platypus(text):
     text = text.replace('**', '')
     return text
 
-def generate_ai_content(prompt, model="deepseek-r1:1.5b", task_name="AI Task"):
+def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
     try:
         print(f"-> Mengirim request untuk '{task_name}' ke model {model}...")
         response = requests.post(
