@@ -2,13 +2,13 @@ from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, sta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List
 from sqlalchemy.orm import Session, joinedload
 import uuid
 import os
 import shutil
 import mimetypes
-from typing import Annotated, Optional, List
+import logging # <-- Perubahan 1: Impor modul logging
 
 from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
@@ -17,21 +17,30 @@ from database import get_db, engine
 import models
 import schemas
 from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload, UserListPayload
-from tools import convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from config import settings
 from generate_fix import generate_full_report
 from generate_fix_pendek import generate_short_report
 
 models.Base.metadata.create_all(bind=engine)
-import logging
 
+# <-- Perubahan 2: Setup logger untuk otentikasi (sudah ada) -->
 auth_logger = logging.getLogger('auth_logger')
 auth_logger.setLevel(logging.INFO)
-file_handler = logging.FileHandler('auth.log', mode='a') # 'a' = append/tambahkan
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
+auth_file_handler = logging.FileHandler('auth.log', mode='a')
+auth_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+auth_file_handler.setFormatter(auth_formatter)
 if not auth_logger.handlers:
-    auth_logger.addHandler(file_handler)
+    auth_logger.addHandler(auth_file_handler)
+
+# <-- Perubahan 3: Setup logger baru KHUSUS untuk proses analisis -->
+analysis_logger = logging.getLogger('analysis_logger')
+analysis_logger.setLevel(logging.INFO)
+analysis_file_handler = logging.FileHandler('analysis.log', mode='a') # Akan membuat file analysis.log
+analysis_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+analysis_file_handler.setFormatter(analysis_formatter)
+if not analysis_logger.handlers:
+    analysis_logger.addHandler(analysis_file_handler)
+
 
 app = FastAPI(
     title="Brainwave Analysis API",
@@ -72,6 +81,7 @@ async def login_for_access_token(
     access_token = create_access_token(data={"sub": user.username, "user_id": user.id})
     return StandardResponse(message="Login berhasil", payload=TokenPayload(access_token=access_token, token_type="bearer"))
 
+# <-- Perubahan 4: Endpoint analyze_edf dirombak total dengan logging dan error handling bertingkat -->
 @app.post("/v1/bwa/analyze/", summary="Admin: Register Client and Analyze Data from EDF", response_model=StandardResponse[AnalysisResult], tags=["BWA"])
 async def analyze_edf(
     db: Session = Depends(get_db), 
@@ -89,180 +99,168 @@ async def analyze_edf(
     pekerjaan: Optional[str] = Form(None),
     operator_name: str = Form(...)
 ):
-    # --- VALIDASI INPUT ---
-    db_user = get_user(db, username)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username for new client already registered")
-    if not file.filename.lower().endswith('.edf'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an .edf file.")
-
-    # --- REGISTRASI USER ---
-    hashed_password = get_password_hash(password)
-    new_user = models.User(
-        fullname=fullname, username=username, password=hashed_password, 
-        company=company, gender=gender, age=age, address=address, 
-        test_date=test_date, test_location=test_location
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    analysis_logger.info(f"===== PROSES ANALISIS BARU DIMULAI UNTUK USER: {username} =====")
     
-    # --- PERSIAPAN FILE PATHS ---
+    # --- LANGKAH 1: VALIDASI INPUT ---
+    analysis_logger.info("[Langkah 1] Memulai validasi input.")
+    try:
+        db_user = get_user(db, username)
+        if db_user:
+            raise HTTPException(status_code=400, detail="Username for new client already registered")
+        if not file.filename.lower().endswith('.edf'):
+            raise HTTPException(status_code=400, detail="Invalid file type. Please upload an .edf file.")
+        analysis_logger.info("[Langkah 1] Validasi input berhasil.")
+    except Exception as e:
+        analysis_logger.error(f"[Langkah 1] Gagal validasi input: {e}", exc_info=True)
+        raise e # Lemparkan kembali exception asli
+
+    # --- LANGKAH 2: REGISTRASI USER ---
+    new_user = None # Inisialisasi new_user
+    try:
+        analysis_logger.info("[Langkah 2] Memulai registrasi user baru.")
+        hashed_password = get_password_hash(password)
+        new_user = models.User(
+            fullname=fullname, username=username, password=hashed_password, 
+            company=company, gender=gender, age=age, address=address, 
+            test_date=test_date, test_location=test_location
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        analysis_logger.info(f"[Langkah 2] Registrasi user '{username}' (ID: {new_user.id}) berhasil.")
+    except Exception as e:
+        analysis_logger.error(f"[Langkah 2] Gagal registrasi user: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan data user baru ke database: {e}")
+
+    # --- PERSIAPAN FILE & PROSES UTAMA ---
     unique_id = uuid.uuid4()
     temp_edf_path = f"./{unique_id}_{file.filename}"
     processed_csv_path = f"./{unique_id}_processed.csv"
     
-    with open(temp_edf_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-        
     try:
-        # --- PROSES & ANALISIS UTAMA ---
-        print("Starting EDF to CSV processing...")
-        process_edf_to_final_csv(temp_edf_path, processed_csv_path)
-        
-        print("Starting full analysis on processed CSV...")
-        result = run_full_analysis(processed_csv_path, new_user.id, username)
-        
-        # --- PEMBUATAN LAPORAN PANJANG ---
-        print("\n--- Memulai integrasi pembuatan Laporan Panjang (PDF) ---")
+        # --- LANGKAH 3: SIMPAN & PROSES FILE EDF KE CSV ---
         try:
+            analysis_logger.info(f"[Langkah 3] Menyimpan file upload ke '{temp_edf_path}'.")
+            with open(temp_edf_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            
+            analysis_logger.info("[Langkah 3] Memulai konversi EDF ke CSV dengan ICA, POW, dan PM.")
+            process_edf_to_final_csv(temp_edf_path, processed_csv_path)
+            analysis_logger.info(f"[Langkah 3] File CSV berhasil dibuat di '{processed_csv_path}'.")
+        except Exception as e:
+            analysis_logger.error(f"[Langkah 3] Gagal pada tahap pemrosesan file: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Gagal saat pemrosesan file EDF ke CSV: {e}")
+
+        # --- LANGKAH 4: JALANKAN ANALISIS LOGIKA UTAMA ---
+        try:
+            analysis_logger.info("[Langkah 4] Memulai analisis logika utama (Big Five, Cognitive, dll).")
+            result = run_full_analysis(processed_csv_path, new_user.id, username)
+            analysis_logger.info("[Langkah 4] Analisis logika utama berhasil diselesaikan.")
+        except Exception as e:
+            analysis_logger.error(f"[Langkah 4] Gagal pada tahap analisis logika: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Gagal saat menjalankan analisis inti: {e}")
+
+        # --- LANGKAH 5: PEMBUATAN LAPORAN PANJANG (PDF) ---
+        try:
+            analysis_logger.info("[Langkah 5] Memulai pembuatan Laporan Panjang (PDF).")
             ALLOWED_PERSONALITIES = {"Openess", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"}
             ALLOWED_COGNITIVE_KEYS = {"Kraepelin Test (Numerik)", "WCST (Logika)", "Digit Span (Short Term Memory)"}
-            
             cognitive_key_map = {
                 "KRAEPELIN TEST": "Kraepelin Test (Numerik)",
                 "WCST": "WCST (Logika)",
                 "DIGIT SPAN": "Digit Span (Short Term Memory)"
             }
-            
-            # Mapping untuk mengambil nama pendek kognitif untuk query DB
-            cognitive_db_name_map = {
-                "KRAEPELIN TEST": "Kraepelin",
-                "WCST": "WCST",
-                "DIGIT SPAN": "Digit Span"
+            cognitive_db_name_map = {"KRAEPELIN TEST": "Kraepelin", "WCST": "WCST", "DIGIT SPAN": "Digit Span"}
+
+            top_personality_data = max(result['big_five'], key=lambda x: x.get('SCORE', 0))
+            top_cognitive_data = max(result['cognitive_function'], key=lambda x: x.get('SCORE', 0))
+            tipe_kepribadian_tertinggi = top_personality_data['PERSONALITY'].title()
+            kognitif_nama_tertinggi = top_cognitive_data['TEST']
+            kognitif_utama_key = cognitive_key_map.get(kognitif_nama_tertinggi.upper())
+
+            if not tipe_kepribadian_tertinggi in ALLOWED_PERSONALITIES or not kognitif_utama_key in ALLOWED_COGNITIVE_KEYS:
+                 raise ValueError("Hasil analisis Big Five atau Kognitif tidak valid/kosong.")
+
+            output_dir_topoplot = "static/topoplots"
+            topoplot_path_behavior = os.path.join(output_dir_topoplot, f"{new_user.username}_topoplot_{top_personality_data['PERSONALITY'].lower().replace(' ', '_')}.png")
+            topoplot_path_cognitive = os.path.join(output_dir_topoplot, f"{new_user.username}_topoplot_{kognitif_nama_tertinggi.lower().replace(' ', '_')}.png")
+
+            biodata_kandidat = {
+                "Nama": new_user.fullname, "Jenis kelamin": new_user.gender, "Usia": f"{new_user.age} Tahun",
+                "Alamat": new_user.address, "Keperluan Test": "Profiling dengan Brain Wave Analysis response",
+                "Tanggal Test": new_user.test_date.strftime('%d %B %Y') if new_user.test_date else "-",
+                "Tempat Test": new_user.test_location, "Operator": operator_name 
             }
-
-            big_five_results = result['big_five']
-            cognitive_results = result['cognitive_function']
             
-            valid_personality_results = [
-                p for p in big_five_results if p.get('PERSONALITY', '').title() in ALLOWED_PERSONALITIES
-            ]
-            valid_cognitive_results = [
-                c for c in cognitive_results if cognitive_key_map.get(c.get('TEST', '').upper()) in ALLOWED_COGNITIVE_KEYS
-            ]
-
-            if not valid_personality_results or not valid_cognitive_results:
-                 print("   -> Peringatan: Hasil analisis Big Five atau Kognitif kosong. Laporan tidak dibuat.")
-            else:
-                top_personality_data = max(big_five_results, key=lambda x: x.get('SCORE', 0))
-                top_cognitive_data = max(cognitive_results, key=lambda x: x.get('SCORE', 0))
-                tipe_kepribadian_tertinggi = top_personality_data['PERSONALITY'].title()
-                kognitif_nama_tertinggi = top_cognitive_data['TEST']
-                kognitif_utama_key = cognitive_key_map.get(kognitif_nama_tertinggi.upper())
-
-                output_dir_topoplot = "static/topoplots"
-                topoplot_behavior_filename = f"{new_user.username}_topoplot_{top_personality_data['PERSONALITY'].lower().replace(' ', '_')}.png"
-                topoplot_cognitive_filename = f"{new_user.username}_topoplot_{kognitif_nama_tertinggi.lower().replace(' ', '_')}.png"
-                topoplot_path_behavior = os.path.join(output_dir_topoplot, topoplot_behavior_filename)
-                topoplot_path_cognitive = os.path.join(output_dir_topoplot, topoplot_cognitive_filename)
-
-                biodata_kandidat = {
-                    "Nama": new_user.fullname,
-                    "Jenis kelamin": new_user.gender,
-                    "Usia": f"{new_user.age} Tahun",
-                    "Alamat": new_user.address,
-                    "Keperluan Test": "Profiling dengan Brain Wave Analysis response",
-                    "Tanggal Test": new_user.test_date.strftime('%d %B %Y') if new_user.test_date else "-",
-                    "Tempat Test": new_user.test_location,
-                    "Operator": operator_name 
-                }
-                
-                output_dir = "static/long_report"
-                os.makedirs(output_dir, exist_ok=True)
-                nama_file_output_panjang = f"{output_dir}/{new_user.username}_long_report.pdf"
-                
-                print(f"   -> Memanggil generate_full_report untuk membuat file: {nama_file_output_panjang}")
-                person_job_fit_text = generate_full_report(
-                    tipe_kepribadian=tipe_kepribadian_tertinggi,
-                    kognitif_utama_key=kognitif_utama_key,
-                    pekerjaan=pekerjaan,
-                    model_ai="llama3.1:8b",
-                    nama_file_output=nama_file_output_panjang,
-                    biodata_kandidat=biodata_kandidat,
-                    topoplot_path_behaviour=topoplot_path_behavior,
-                    topoplot_path_cognitive=topoplot_path_cognitive
-                )
-                
-                user_to_update = db.query(models.User).filter(models.User.id == new_user.id).first()
-                if user_to_update:
-                    user_to_update.laporan_panjang = nama_file_output_panjang
-                    db.commit()
-                result['long_report_url'] = f"{settings.BASE_URL}/{nama_file_output_panjang}"
-
-                # --- PERUBAHAN 2: BLOK LOGIKA BARU UNTUK LAPORAN PENDEK ---
-                print("\n--- Memulai integrasi pembuatan Laporan Pendek (PDF) ---")
-                try:
-                    # Ambil detail (title & desc) dari DB untuk laporan pendek
-                    personality_details = db.query(models.Personality).filter(models.Personality.name == tipe_kepribadian_tertinggi).first()
-                    
-                    cognitive_db_name = cognitive_db_name_map.get(kognitif_nama_tertinggi.upper())
-                    cognitive_details = db.query(models.Test).filter(models.Test.name == cognitive_db_name).first()
-
-                    if not personality_details or not cognitive_details:
-                        print("   -> Peringatan: Gagal mendapatkan detail kepribadian/kognitif dari DB. Laporan pendek dilewati.")
-                    else:
-                        output_dir_pendek = "static/short_report"
-                        os.makedirs(output_dir_pendek, exist_ok=True)
-                        nama_file_output_pendek = f"{output_dir_pendek}/{new_user.username}_short_report.pdf"
-
-                        print(f"   -> Memanggil generate_short_report untuk membuat file: {nama_file_output_pendek}")
-                        generate_short_report(
-                            tipe_kepribadian=tipe_kepribadian_tertinggi,
-                            kognitif_utama_key=kognitif_utama_key,
-                            pekerjaan=pekerjaan,
-                            model_ai="llama3.1:8b",
-                            nama_file_output=nama_file_output_pendek,
-                            biodata_kandidat=biodata_kandidat,
-                            topoplot_path_behaviour=topoplot_path_behavior,
-                            topoplot_path_cognitive=topoplot_path_cognitive,
-                            personality_title=personality_details.title,
-                            personality_desc=personality_details.description,
-                            cognitive_title=cognitive_details.title,
-                            cognitive_desc=cognitive_details.description,
-                            person_job_fit_text_from_long_report=person_job_fit_text
-                        )
-                        
-                        if user_to_update:
-                            user_to_update.laporan_pendek = nama_file_output_pendek
-                            db.commit()
-                            print("   -> Path laporan pendek berhasil disimpan.")
-                        
-                        result['short_report_url'] = f"{settings.BASE_URL}/{nama_file_output_pendek}"
-                        print(f"   -> URL Laporan pendek ditambahkan ke payload: {result['short_report_url']}")
-
-                except Exception as short_report_error:
-                    print(f"   -> !!! Terjadi error saat membuat laporan PDF pendek: {short_report_error}")
-                # --- AKHIR BLOK LAPORAN PENDEK ---
-                
-        except Exception as report_error:
-            print(f"   -> !!! Terjadi error saat membuat laporan PDF: {report_error}")
+            output_dir = "static/long_report"
+            os.makedirs(output_dir, exist_ok=True)
+            nama_file_output_panjang = f"{output_dir}/{new_user.username}_long_report.pdf"
             
+            analysis_logger.info(f"   -> Memanggil generate_full_report untuk {nama_file_output_panjang}")
+            person_job_fit_text = generate_full_report(
+                tipe_kepribadian=tipe_kepribadian_tertinggi, kognitif_utama_key=kognitif_utama_key, pekerjaan=pekerjaan,
+                model_ai="llama3.1:8b", nama_file_output=nama_file_output_panjang, biodata_kandidat=biodata_kandidat,
+                topoplot_path_behaviour=topoplot_path_behavior, topoplot_path_cognitive=topoplot_path_cognitive
+            )
+            
+            user_to_update = db.query(models.User).filter(models.User.id == new_user.id).first()
+            user_to_update.laporan_panjang = nama_file_output_panjang
+            db.commit()
+            result['long_report_url'] = f"{settings.BASE_URL}/{nama_file_output_panjang}"
+            analysis_logger.info("[Langkah 5] Pembuatan laporan panjang berhasil.")
+        except Exception as e:
+            analysis_logger.error(f"[Langkah 5] Gagal saat membuat laporan PDF panjang: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Gagal saat generate laporan panjang: {e}")
+
+        # --- LANGKAH 6: PEMBUATAN LAPORAN PENDEK (PDF) ---
+        try:
+            analysis_logger.info("[Langkah 6] Memulai pembuatan Laporan Pendek (PDF).")
+            personality_details = db.query(models.Personality).filter(models.Personality.name == tipe_kepribadian_tertinggi).first()
+            cognitive_db_name = cognitive_db_name_map.get(kognitif_nama_tertinggi.upper())
+            cognitive_details = db.query(models.Test).filter(models.Test.name == cognitive_db_name).first()
+
+            if not personality_details or not cognitive_details:
+                raise ValueError("Gagal mendapatkan detail kepribadian/kognitif dari DB untuk laporan pendek.")
+
+            output_dir_pendek = "static/short_report"
+            os.makedirs(output_dir_pendek, exist_ok=True)
+            nama_file_output_pendek = f"{output_dir_pendek}/{new_user.username}_short_report.pdf"
+
+            analysis_logger.info(f"   -> Memanggil generate_short_report untuk {nama_file_output_pendek}")
+            generate_short_report(
+                tipe_kepribadian=tipe_kepribadian_tertinggi, kognitif_utama_key=kognitif_utama_key, pekerjaan=pekerjaan,
+                model_ai="llama3.1:8b", nama_file_output=nama_file_output_pendek, biodata_kandidat=biodata_kandidat,
+                topoplot_path_behaviour=topoplot_path_behavior, topoplot_path_cognitive=topoplot_path_cognitive,
+                personality_title=personality_details.title, personality_desc=personality_details.description,
+                cognitive_title=cognitive_details.title, cognitive_desc=cognitive_details.description,
+                person_job_fit_text_from_long_report=person_job_fit_text
+            )
+            
+            user_to_update.laporan_pendek = nama_file_output_pendek
+            db.commit()
+            result['short_report_url'] = f"{settings.BASE_URL}/{nama_file_output_pendek}"
+            analysis_logger.info("[Langkah 6] Pembuatan laporan pendek berhasil.")
+        except Exception as e:
+            analysis_logger.error(f"[Langkah 6] Gagal saat membuat laporan PDF pendek: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Gagal saat generate laporan pendek: {e}")
+
+        analysis_logger.info(f"===== PROSES ANALISIS SELESAI DENGAN SUKSES UNTUK USER: {username} =====")
         return StandardResponse(message="Analisis dari file EDF berhasil dan data client baru telah disimpan.", payload=result)
-        
-    except Exception as e:
-        db.delete(new_user)
-        db.commit()
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-        
+
     finally:
+        # --- BLOK PEMBERSIHAN FILE SEMENTARA ---
+        analysis_logger.info("Memulai pembersihan file sementara.")
         if os.path.exists(temp_edf_path):
             os.remove(temp_edf_path)
+            analysis_logger.info(f"   -> File '{temp_edf_path}' dihapus.")
         if os.path.exists(processed_csv_path):
             os.remove(processed_csv_path)
+            analysis_logger.info(f"   -> File '{processed_csv_path}' dihapus.")
         for temp_file in ["cleaning.csv", "cleaning2.csv"]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
+                analysis_logger.info(f"   -> File '{temp_file}' dihapus.")
 
 @app.post("/v1/bwa/tools/edf-to-csv", summary="Convert EDF to a single CSV file", response_model=StandardResponse[FilePathPayload], tags=["BWA"])
 async def convert_edf_to_csv_endpoint(file: UploadFile = File(...)):
