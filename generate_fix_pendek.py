@@ -34,7 +34,7 @@ def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
                 "model": model, "prompt": prompt, "stream": False,
                 "options": { "temperature": 0.2, "top_p": 0.9, "num_predict": 2048, "repeat_penalty": 1.2 }
             },
-            timeout=300
+            timeout=600
         )
         if response.status_code == 200:
             result = response.json()

@@ -2,6 +2,8 @@ from sqlalchemy import (
     Column, Integer, String, Text, Enum, Date, Float, 
     ForeignKey
 )
+# Perubahan 1: Impor tipe data DOUBLE
+from sqlalchemy.dialects.mysql import DOUBLE
 from sqlalchemy.orm import relationship
 from database import Base, engine
 
@@ -92,11 +94,14 @@ class UserResponse(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     stimulation_id = Column(Integer, ForeignKey("stimulations.id"), nullable=False)
-    engagement = Column(Float)
-    interest = Column(Float)
-    focus = Column(Float)
-    relaxation = Column(Float)
-    attention = Column(Float)
+    
+    # Perubahan 2: Ganti semua Float menjadi DOUBLE
+    engagement = Column(DOUBLE)
+    interest = Column(DOUBLE)
+    focus = Column(DOUBLE)
+    relaxation = Column(DOUBLE)
+    attention = Column(DOUBLE)
+    
     user = relationship("User", back_populates="response_data")
     stimulation = relationship("Stimulation", back_populates="user_response_data")
     

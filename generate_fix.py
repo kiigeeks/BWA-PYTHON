@@ -308,7 +308,7 @@ def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
                     "repeat_penalty": 1.2, "stop": ["Data referensi:", "Tugas:", "Instruksi:"]
                 }
             },
-            timeout=300
+            timeout=600
         )
         if response.status_code == 200:
             result = response.json()
