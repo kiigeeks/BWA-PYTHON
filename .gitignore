@@ -47,3 +47,4 @@ __pycache__/
 /output_files/
 *csv
 *edf
+*.log

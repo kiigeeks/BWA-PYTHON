@@ -460,8 +460,23 @@ def save_to_mysql(results, user_id, username):
     cursor = db.cursor()
 
     def clean_nan(value):
+        """
+        Membersihkan nilai NaN dan mengonversi tipe data NumPy
+        menjadi tipe data standar Python agar kompatibel dengan database.
+        """
+        # Cek jika value adalah tipe float dari NumPy (misal: np.float64)
+        if isinstance(value, np.floating):
+            # Jika NaN, kembalikan None. Jika tidak, konversi ke float standar.
+            return None if np.isnan(value) else float(value)
+        
+        # Cek jika value adalah tipe integer dari NumPy (misal: np.int64)
+        if isinstance(value, np.integer):
+            return int(value)
+        
+        # Cek untuk float standar Python (menjaga logika lama)
         if isinstance(value, float) and np.isnan(value):
             return None
+            
         return value
 
     personality_ids = {
