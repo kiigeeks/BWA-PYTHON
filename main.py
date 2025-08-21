@@ -13,6 +13,7 @@ from celery import Celery
 from fastapi.responses import JSONResponse
 from tasks import process_analysis_task
 from logger_config import setup_logger
+from datetime import date
 
 from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
@@ -99,7 +100,7 @@ async def analyze_edf(
     gender: str = Form(...),
     age: int = Form(...),
     address: str = Form(...),
-    test_date: str = Form(...),
+    test_date: date = Form(...),
     test_location: str = Form(...),
     pekerjaan: Optional[str] = Form(None),
     operator_name: str = Form(...)
@@ -112,16 +113,30 @@ async def analyze_edf(
         raise HTTPException(status_code=400, detail="Username for new client already registered")
     if not file.filename.lower().endswith('.edf'):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload an .edf file.")
+    try:
+        analysis_logger.info("Mencoba membuat objek user di memori...")
+        new_user = models.User(
+            fullname=fullname, username=username, password=get_password_hash(password),
+            company=company, gender=gender, age=age, address=address,
+            test_date=test_date, test_location=test_location
+        )
+        
+        analysis_logger.info("Mencoba menambahkan user ke sesi database...")
+        db.add(new_user)
+        
+        analysis_logger.info("Mencoba melakukan commit ke database...")
+        db.commit() # <-- Titik rawan error
+        
+        analysis_logger.info("Mencoba me-refresh instance user...")
+        db.refresh(new_user)
+        
+        analysis_logger.info(f"Registrasi user '{username}' (ID: {new_user.id}) berhasil.")
 
-    new_user = models.User(
-        fullname=fullname, username=username, password=get_password_hash(password),
-        company=company, gender=gender, age=age, address=address,
-        test_date=test_date, test_location=test_location
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    analysis_logger.info(f"Registrasi user '{username}' (ID: {new_user.id}) berhasil.")
+    except Exception as e:
+        # JIKA TERJADI ERROR, LOG INI AKAN TERCATAT SEBELUM CRASH!
+        analysis_logger.error(f"GAGAL TOTAL SAAT REGISTRASI USER! Error: {e}", exc_info=True)
+        db.rollback() # Batalkan transaksi yang gagal
+        raise HTTPException(status_code=500, detail=f"Database error during user registration: {e}")
 
     # --- TUGAS CEPAT 2: Simpan & Konversi File EDF (Tetap di sini) ---
     unique_id = uuid.uuid4()
