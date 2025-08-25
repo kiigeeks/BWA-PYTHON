@@ -239,7 +239,7 @@ async def read_users(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
     limit: int = 10,
-    last_id: Optional[int] = None,
+    last_id: Optional[int] = -1,
     search: Optional[str] = None
 ):
     """
@@ -254,7 +254,7 @@ async def read_users(
     if search:
         query = query.filter(models.User.fullname.ilike(f"%{search}%"))
         
-    if last_id is not None:
+    if last_id is not -1:
         query = query.filter(models.User.id < last_id)
         
     query_limit = limit + 1
