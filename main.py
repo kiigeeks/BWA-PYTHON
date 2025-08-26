@@ -8,7 +8,8 @@ import uuid
 import os
 import shutil
 import mimetypes
-import logging # <-- Perubahan 1: Impor modul logging
+import logging
+from fastapi.staticfiles import StaticFiles
 from celery import Celery
 from fastapi.responses import JSONResponse
 from tasks import process_analysis_task
@@ -66,6 +67,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", tags=["Status"])
 async def read_root():

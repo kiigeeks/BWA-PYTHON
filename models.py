@@ -1,6 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Enum, Date, Float, 
-    ForeignKey
+    Column, Integer, String, Text, Enum, Date, Float, Double, ForeignKey
 )
 from sqlalchemy.orm import relationship
 from database import Base, engine
@@ -93,11 +92,11 @@ class UserResponse(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     stimulation_id = Column(Integer, ForeignKey("stimulations.id"), nullable=False)
-    engagement = Column(Float)
-    interest = Column(Float)
-    focus = Column(Float)
-    relaxation = Column(Float)
-    attention = Column(Float)
+    engagement = Column(Double)
+    interest = Column(Double)
+    focus = Column(Double)
+    relaxation = Column(Double)
+    attention = Column(Double)
     user = relationship("User", back_populates="response_data")
     stimulation = relationship("Stimulation", back_populates="user_response_data")
     
