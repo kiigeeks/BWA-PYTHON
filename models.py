@@ -26,8 +26,9 @@ class User(Base):
     address = Column(String(255), nullable=True) 
     test_date = Column(Date, nullable=True)
     test_location = Column(String(255), nullable=True)
+    operator = Column(String(255), nullable=True)
     roles = Column(Enum('admin', 'user', name='user_roles_enum'), default='user')
-    jobs = Column(String(255), nullable=True)  # Masih ada, karena kamu tidak minta hapus
+    jobs = Column(String(255), nullable=True)
     laporan_panjang = Column(String(255), nullable=True)
     laporan_pendek = Column(String(255), nullable=True)
 

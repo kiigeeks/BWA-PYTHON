@@ -59,6 +59,7 @@ class User(BaseModel):
     address: Optional[str] = None
     test_date: Optional[datetime.date] = None
     test_location: Optional[str] = None
+    operator: Optional[str] = None
     roles: Optional[str] = None
     jobs: Optional[str] = None
     laporan_panjang: Optional[str] = None

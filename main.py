@@ -118,7 +118,7 @@ async def analyze_edf(
         new_user = models.User(
             fullname=fullname, username=username, password=get_password_hash(password),
             company=company, gender=gender, age=age, address=address,
-            test_date=test_date, test_location=test_location
+            test_date=test_date, test_location=test_location, operator=operator_name
         )
         
         analysis_logger.info("Mencoba menambahkan user ke sesi database...")
@@ -152,7 +152,7 @@ async def analyze_edf(
         # --- TUGAS BERAT: Delegasikan ke Celery! ---
         analysis_logger.info(f"Mendelegasikan analisis penuh untuk user ID {new_user.id} ke background worker...")
         process_analysis_task.delay(
-            processed_csv_path, new_user.id, username, pekerjaan, operator_name
+            processed_csv_path, new_user.id, username, pekerjaan
         )
 
         # --- LANGSUNG KEMBALIKAN RESPONSE (Jangan Menunggu) ---
@@ -219,6 +219,45 @@ async def download_file(filepath: str):
         filename=os.path.basename(filepath)
     )
 
+@app.delete("/v1/bwa/users/{user_id}", response_model=StandardResponse, summary="Admin: Delete a User", tags=["BWA"])
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(get_current_user)
+):
+    """
+    Menghapus user dan semua data terkaitnya. Tindakan ini tidak bisa dibatalkan.
+    Hanya bisa diakses oleh user dengan role 'admin'.
+    """
+    # 1. Otorisasi: Cek apakah user yang login adalah admin
+    if current_admin.roles != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Anda tidak memiliki izin untuk menghapus user."
+        )
+
+    # 2. Cari user yang akan dihapus
+    user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+
+    # 3. Handle jika user tidak ditemukan
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User dengan ID {user_id} tidak ditemukan."
+        )
+        
+    # 4. Mencegah admin menghapus akunnya sendiri
+    if user_to_delete.id == current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin tidak dapat menghapus akunnya sendiri."
+        )
+
+    db.delete(user_to_delete)
+    db.commit()
+
+    return StandardResponse(message=f"User '{user_to_delete.username}' (ID: {user_id}) dan semua data terkaitnya berhasil dihapus.")
+
 @app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["BWA"])
 async def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = db.query(models.User).options(
@@ -254,7 +293,7 @@ async def read_users(
     if search:
         query = query.filter(models.User.fullname.ilike(f"%{search}%"))
         
-    if last_id is not -1:
+    if last_id != -1:
         query = query.filter(models.User.id < last_id)
         
     query_limit = limit + 1

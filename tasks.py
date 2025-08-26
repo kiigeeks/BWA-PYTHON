@@ -21,14 +21,14 @@ analysis_logger = setup_logger('analysis_logger', 'analysis.log')
 # 2. Definisikan tugas latar belakang
 @celery_app.task
 def process_analysis_task(
-    processed_csv_path, user_id, username, pekerjaan, operator_name
+    processed_csv_path, user_id, username, pekerjaan
 ):
     """
     Fungsi ini akan dijalankan oleh Celery di latar belakang.
     Isinya adalah semua proses yang memakan waktu lama.
     """
     analysis_logger.info(f"CELERY WORKER: Memulai analisis untuk user ID {user_id}...")
-    db = SessionLocal() # Buat sesi database baru khusus untuk task ini
+    db = SessionLocal()
     try:
         # --- LANGKAH A: JALANKAN ANALISIS LOGIKA INTI ---
         analysis_logger.info(f"CELERY WORKER: Menjalankan run_full_analysis untuk {username}")
@@ -37,7 +37,6 @@ def process_analysis_task(
 
         # --- LANGKAH B: GENERATE LAPORAN PANJANG ---
         analysis_logger.info("CELERY WORKER: Memulai pembuatan laporan panjang...")
-        # (Logika ini disalin langsung dari main.py yang lama)
         ALLOWED_PERSONALITIES = {"Openess", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"}
         ALLOWED_COGNITIVE_KEYS = {"Kraepelin Test (Numerik)", "WCST (Logika)", "Digit Span (Short Term Memory)"}
         cognitive_key_map = {
@@ -65,7 +64,7 @@ def process_analysis_task(
             "Nama": user.fullname, "Jenis kelamin": user.gender, "Usia": f"{user.age} Tahun",
             "Alamat": user.address, "Keperluan Test": "Profiling dengan Brain Wave Analysis response",
             "Tanggal Test": user.test_date.strftime('%d %B %Y') if user.test_date else "-",
-            "Tempat Test": user.test_location, "Operator": operator_name
+            "Tempat Test": user.test_location, "Operator": user.operator
         }
 
         output_dir = "static/long_report"
