@@ -125,3 +125,7 @@ class UserListPayload(BaseModel):
     data: List[User] = Field(..., description="Daftar data pengguna untuk halaman ini.")
     last_id: Optional[int] = Field(None, description="ID terakhir dalam daftar, untuk digunakan di permintaan berikutnya.")
     has_more: bool = Field(..., description="Menandakan apakah masih ada data setelah halaman ini.")
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str

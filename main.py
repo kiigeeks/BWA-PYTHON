@@ -22,7 +22,7 @@ from logic import run_full_analysis
 from database import get_db, engine
 import models
 import schemas
-from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload, UserListPayload
+from schemas import StandardResponse, AnalysisResult, User as UserSchema, FilePathPayload, TokenPayload, UserListPayload, PasswordChange
 from config import settings
 from generate_fix import generate_full_report
 from generate_fix_pendek import generate_short_report
@@ -260,6 +260,39 @@ async def delete_user(
     db.commit()
 
     return StandardResponse(message=f"User '{user_to_delete.username}' (ID: {user_id}) dan semua data terkaitnya berhasil dihapus.")
+
+@app.put("/v1/bwa/users/password/{user_id}", response_model=StandardResponse, summary="Change User Password", tags=["BWA"])
+async def change_user_password(
+    user_id: int,
+    # Menggunakan Form Data, bukan JSON Body
+    old_password: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Mengubah password untuk seorang pengguna. Pengguna hanya dapat mengubah password-nya sendiri.
+    """
+    # 1. Otorisasi: Pastikan user yang login mengubah passwordnya sendiri
+    if current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Anda tidak memiliki izin untuk mengubah password pengguna lain."
+        )
+
+    # 2. Verifikasi password lama
+    if not verify_password(old_password, current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password lama salah."
+        )
+
+    # 3. Hash dan perbarui password baru
+    hashed_new_password = get_password_hash(new_password)
+    current_user.password = hashed_new_password
+    db.commit()
+
+    return StandardResponse(message="Password berhasil diperbarui.")
 
 @app.get("/v1/bwa/users/{user_id}", response_model=StandardResponse[UserSchema], summary="Get User by ID with All Relations", tags=["BWA"])
 async def read_user(user_id: int, db: Session = Depends(get_db)):
