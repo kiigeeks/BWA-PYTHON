@@ -23,6 +23,10 @@ from cognitive_traits_data import COGNITIVE_TRAITS_BANK
 # ==============================================================================
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
+class OllamaConnectionError(Exception):
+    """Exception khusus untuk menandai error koneksi ke Ollama."""
+    pass
+
 # Template Prompt dipindahkan ke scope global agar lebih rapi
 PROMPT_TEMPLATES = {
     "prompt_step1_deep_analysis_and_score": """
@@ -293,16 +297,13 @@ def extract_relevant_data(full_text, keywords):
 def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
     """
     Fungsi generik untuk berinteraksi dengan model AI Ollama.
-    Versi ini memiliki pembersih otomatis untuk menghapus kalimat pembuka yang tidak diinginkan.
     """
     try:
         print(f"-> Mengirim request untuk '{task_name}' ke model {model}...")
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": model,
-                "prompt": prompt,
-                "stream": False,
+                "model": model, "prompt": prompt, "stream": False,
                 "options": {
                     "temperature": 0.1, "top_p": 0.8, "num_predict": 2000,
                     "repeat_penalty": 1.2, "stop": ["Data referensi:", "Tugas:", "Instruksi:"]
@@ -313,42 +314,31 @@ def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
         if response.status_code == 200:
             result = response.json()
             generated_text = result.get("response", "").strip()
-
             if not generated_text:
                 return f"Error: Model tidak menghasilkan response untuk {task_name}."
-
-            # --- BLOK PEMBERSIH OTOMATIS ---
-            # Daftar kalimat pembuka yang akan dideteksi dan dihapus
+            
+            # (Blok pembersih otomatis tetap ada)
             boilerplate_phrases = [
                 "Berikut adalah ringkasan profil kandidat yang padat, lugas, dan profesional:",
-                "Berikut adalah analisisnya:",
-                "Tentu, berikut adalah analisisnya:",
-                "Here is the analysis:",
-                "Here's the analysis:",
-                "Sebagai seorang konsultan SDM profesional,",
-                "Sebagai seorang analis karir,"
+                "Berikut adalah analisisnya:", "Tentu, berikut adalah analisisnya:",
+                "Here is the analysis:", "Here's the analysis:",
+                "Sebagai seorang konsultan SDM profesional,", "Sebagai seorang analis karir,"
             ]
-            
-            # Periksa setiap frasa dan hapus jika ditemukan di awal jawaban
             for phrase in boilerplate_phrases:
-                # Menggunakan lower() untuk perbandingan case-insensitive
                 if generated_text.lower().strip().startswith(phrase.lower()):
-                    # Hapus frasa tersebut dari awal teks
                     generated_text = generated_text[len(phrase):].lstrip(' :')
-                    print(f"   -- Kalimat pembuka terdeteksi dan dibersihkan.")
-                    break # Hentikan setelah menemukan satu kecocokan
-            # --------------------------------
-
+                    break
+            
             print(f"   -- Berhasil meng-generate '{task_name}'.")
             return generated_text
+        
+        raise OllamaConnectionError(f"Error: HTTP {response.status_code} - {response.text}")
 
-        return f"Error: HTTP {response.status_code} - {response.text}"
     except requests.exceptions.ConnectionError:
-        return "Error: Tidak bisa connect ke Ollama server. Pastikan 'ollama serve' sudah jalan."
+        # --- PERUBAHAN 2: Ganti 'return' dengan 'raise' ---
+        raise OllamaConnectionError("Tidak bisa terhubung ke Ollama server. Pastikan 'ollama serve' sudah berjalan.")
     except Exception as e:
-        return f"Error saat generate {task_name}: {str(e)}"
-
-
+        raise OllamaConnectionError(f"Error saat generate {task_name}: {str(e)}")
 
 # ==============================================================================
 # BAGIAN 4: FUNGSI-FUNGSI UNTUK MENGGAMBAR PDF

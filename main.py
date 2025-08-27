@@ -120,7 +120,7 @@ async def analyze_edf(
         analysis_logger.info("Mencoba membuat objek user di memori...")
         new_user = models.User(
             fullname=fullname, username=username, password=get_password_hash(password),
-            company=company, gender=gender, age=age, address=address,
+            company=company, gender=gender, age=age, address=address, jobs=pekerjaan,
             test_date=test_date, test_location=test_location, operator=operator_name
         )
         

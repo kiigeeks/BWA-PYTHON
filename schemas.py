@@ -64,7 +64,8 @@ class User(BaseModel):
     jobs: Optional[str] = None
     laporan_panjang: Optional[str] = None
     laporan_pendek: Optional[str] = None
-
+    is_error: bool = False
+    error_message: Optional[str] = None
     personalities_data: List[UserPersonality] = []
     cognitive_data: List[UserCognitive] = []
     response_data: List[UserResponse] = []

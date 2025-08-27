@@ -16,6 +16,10 @@ import os
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
+class OllamaConnectionError(Exception):
+    """Exception khusus untuk menandai error koneksi ke Ollama."""
+    pass
+
 # ==============================================================================
 # === FUNGSI BANTUAN ===
 # ==============================================================================
@@ -46,15 +50,23 @@ def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
         if response.status_code == 200:
             result = response.json()
             generated_text = result.get("response", "").strip()
-            if not generated_text: return f"Error: Model tidak menghasilkan response."
+            if not generated_text:
+                # Ini juga bisa kita jadikan exception jika diinginkan, tapi return error masih oke
+                return f"Error: Model tidak menghasilkan response."
             print(f"   -- Berhasil meng-generate '{task_name}'.")
             return generated_text
-        return f"Error: HTTP {response.status_code} - {response.text}"
-    except requests.exceptions.ConnectionError:
-        return "Error: Tidak bisa connect ke Ollama server."
-    except Exception as e:
-        return f"Error saat generate {task_name}: {str(e)}"
+        
+        # Melempar error untuk status HTTP yang buruk juga merupakan ide bagus
+        raise OllamaConnectionError(f"Error: HTTP {response.status_code} - {response.text}")
 
+    except requests.exceptions.ConnectionError:
+        # --- PERUBAHAN 2: Ganti 'return' dengan 'raise' ---
+        # Ini akan menghentikan proses dan ditangkap oleh tasks.py
+        raise OllamaConnectionError("Tidak bisa terhubung ke Ollama server. Pastikan 'ollama serve' sudah berjalan.")
+    except Exception as e:
+        # Melempar kembali error lain sebagai exception yang lebih spesifik
+        raise OllamaConnectionError(f"Error saat generate {task_name}: {str(e)}")
+    
 def extract_relevant_data(full_text, keywords):
     all_headings = [
         "Openess", "Conscientiousness", "Extraversion",

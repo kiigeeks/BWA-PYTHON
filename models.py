@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Enum, Date, Float, Double, ForeignKey
+    Column, Integer, String, Text, Enum, Date, Float, Double, ForeignKey, Boolean
 )
 from sqlalchemy.orm import relationship
 from database import Base, engine
@@ -30,7 +30,8 @@ class User(Base):
     jobs = Column(String(255), nullable=True)
     laporan_panjang = Column(String(255), nullable=True)
     laporan_pendek = Column(String(255), nullable=True)
-
+    is_error = Column(Boolean, default=False, nullable=False)
+    error_message = Column(Text, nullable=True)
     personalities_data = relationship("UserPersonality", back_populates="user", cascade="all, delete-orphan")
     cognitive_data = relationship("UserCognitive", back_populates="user", cascade="all, delete-orphan")
     response_data = relationship("UserResponse", back_populates="user", cascade="all, delete-orphan")
