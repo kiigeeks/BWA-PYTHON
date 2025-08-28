@@ -116,7 +116,7 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
 
     if not pekerjaan or not pekerjaan.strip():
         print(" -> Mode: Analisis Profil Umum (Tanpa Pekerjaan)")
-        prompt_master_general = f"Anda adalah seorang psikolog ahli.\nTUGAS: Tulis analisis mendalam (2-3 paragraf) tentang profil umum individu berdasarkan kombinasi kepribadian dan kognitifnya. Fokus pada kekuatan unik dan potensi area pengembangan. JANGAN sebutkan pekerjaan atau kecocokan kerja.\nPROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.\nKONTEKS DATA:\n---\n{specific_context}\n---"
+        prompt_master_general = f"Anda adalah seorang psikolog ahli.\nTUGAS: Tulis analisis mendalam (2-3 paragraf) tentang profil umum individu berdasarkan kombinasi kepribadian dan kognitifnya. Fokus pada kekuatan unik dan potensi area pengembangan. JANGAN sebutkan pekerjaan atau kesesuaian kerja.\nPROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.\nKONTEKS DATA:\n---\n{specific_context}\n---"
         master_analysis = generate_ai_content(prompt_master_general, model=model_ai, task_name="Langkah 1: Master Analysis (Umum)")
         
         prompt_advantages = f'Berdasarkan teks analisis profil umum berikut:\nANALISIS: "{master_analysis}"\nTUGAS: Identifikasi 4 kelebihan atau kekuatan utama dari profil individu tersebut.\nINSTRUKSI:\n1. Tulis dalam format daftar singkat (4 poin).\n2. Setiap poin ringkas, maksimal 8 kata.\n3. Gunakan bahasa sederhana dan positif.\n4. Jangan sertakan kalimat pembuka atau penutup.'
@@ -132,23 +132,23 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
 
         print("Analisis AI untuk Profil Umum selesai.")
         return {
-            "suitability": "Kelebihan Utama Profil",
+            "suitability": "Pertimbangan Berdasarkan Brain Wave Analysis",
             "position": "Analisis Profil Psikologis Umum",
-            "reasons_title": "Kelebihan:",
+            "reasons_title": "Pertimbangan:",
             "reasons": clean_ai_list(advantages_cleaned),
             "suggestions": [truncate_text(s, 12) for s in clean_ai_list(suggestions_cleaned)],
             "tips": tips_text.strip()
         }
 
     else:
-        print(f" -> Mode: Analisis Kecocokan untuk Pekerjaan '{pekerjaan}'")
+        print(f" -> Mode: Analisis Kesesuaian untuk Pekerjaan '{pekerjaan}'")
         prompt_master = f"Anda adalah seorang analis psikologi.\nTUGAS: Tulis analisis mendalam (2-3 paragraf) tentang profil kandidat untuk posisi yang ditentukan. Fokus pada kekuatan, kelemahan, dan potensi pengembangan.\nPROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.\nPOSISI: {pekerjaan}.\nKONTEKS DATA:\n---\n{specific_context}\n---"
         master_analysis = generate_ai_content(prompt_master, model=model_ai, task_name="Langkah 1: Master Analysis (Pekerjaan)")
         
-        prompt_level = f'Berdasarkan teks analisis berikut, pilih SATU level kecocokan.\nANALISIS: "{master_analysis}"\nPILIHAN: SANGAT COCOK, COCOK DENGAN CATATAN PENGEMBANGAN, KURANG COCOK.\nJawaban Anda harus HANYA SATU dari tiga pilihan tersebut.'
+        prompt_level = f'Berdasarkan teks analisis berikut, pilih SATU level kesesuaian.\nANALISIS: "{master_analysis}"\nPILIHAN: SANGAT SESUAI, SESUAI DENGAN CATATAN PENGEMBANGAN, KURANG SESUAI.\nJawaban Anda harus HANYA SATU dari tiga pilihan tersebut.'
         determined_level_raw = generate_ai_content(prompt_level, model=model_ai, task_name="Langkah 2: Penentuan Level")
-        cleaned_level = determined_level_raw.strip().lstrip('-* ').rstrip('.,').upper().replace("SESUAI", "COCOK")
-        valid_levels, determined_level = ["SANGAT COCOK", "KURANG COCOK", "COCOK DENGAN CATATAN PENGEMBANGAN"], "COCOK DENGAN CATATAN PENGEMBANGAN"
+        cleaned_level = determined_level_raw.strip().lstrip('-* ').rstrip('.,').upper().replace("SESUAI", "sesuai")
+        valid_levels, determined_level = ["SANGAT SESUAI", "KURANG SESUAI", "SESUAI DENGAN CATATAN PENGEMBANGAN"], "SESUAI DENGAN CATATAN PENGEMBANGAN"
         if cleaned_level in valid_levels: determined_level = cleaned_level
 
         prompt_reasons = f'Berdasarkan teks analisis berikut, individu dinilai \'{determined_level}\' untuk pekerjaan tersebut.\nANALISIS: "{master_analysis}"\nTUGAS: Identifikasi 4 alasan utama berupa kekuatan atau sifat positif yang mendukung penilaian tersebut.\nINSTRUKSI:\n1. Tulis dalam format daftar singkat (4 poin).\n2. Setiap poin ringkas, maksimal 8 kata.\n3. Gunakan bahasa sederhana.\n4. Hindari jargon teknis.\n5. Jangan sertakan kalimat pembuka/penutup.'
@@ -350,7 +350,7 @@ def halaman_2_traits(c, data, page_num):
     c.setFillColorRGB(252/255, 228/255, 214/255, alpha=0.85); c.setStrokeColor(merah_muda_border); c.setLineWidth(1.5)
     c.roundRect(25*mm, pengembangan_y_top - pengembangan_height, 160*mm, pengembangan_height, 5*mm, fill=1, stroke=1)
     c.setFillColor(black); c.setFont("Times-Bold", 13)
-    c.drawCentredString(105*mm, pengembangan_y_top - 20, "Pengembangan yang Harus Dilakukan")
+    c.drawCentredString(105*mm, pengembangan_y_top - 20, "Area Pengembangan yang Dapat Dilakukan")
     y = pengembangan_y_top - 35
     for suggestion_md in data.get('suggestions', []):
         p = Paragraph(f"• {markdown_to_html_platypus(suggestion_md)}", style_saran)
@@ -396,7 +396,7 @@ def halaman_3_job_fit(c, job_data, page_num):
             c.setFont("Times-Bold", 12); c.setFillColor(black)
             c.drawString(text_x, text_y, f"{item['job']['title']}")
             c.setFont("Times-Bold", 11)
-            c.drawString(text_x, text_y - 15, "Alasan:")
+            c.drawString(text_x, text_y - 15, "Pertimbangan:")
             c.setFont("Times-Roman", 11)
             for i_line, line in enumerate(item["wrapped"]):
                 line_y = text_y - 30 - (i_line * 12)
@@ -412,7 +412,17 @@ def halaman_4_disclaimer(c, disclaimer_text, page_num):
     c.setFont("Times-Bold", 12)
     c.setFillColor(black)
     c.drawString(20 * mm, PAGE_HEIGHT - 150, "Disclaimer")
-    text_width, style = PAGE_WIDTH - 40 * mm, ParagraphStyle(name='Justified', fontName='Times-Roman', fontSize=10, leading=15, alignment=TA_JUSTIFY)
+    text_width, style = PAGE_WIDTH - 40 * mm, ParagraphStyle(
+        name="JustifySmall",
+        fontName="Times-Roman",
+        fontSize=11.5,
+        leading=14,
+        alignment=TA_JUSTIFY,
+        leftIndent=20,
+        firstLineIndent=-20,
+        spaceAfter=8,
+        underlineWidth=0.4,
+        underlineOffset= -2.5)
     p = Paragraph(disclaimer_text.replace('\n', ' ').replace('  ', ' '), style)
     w, h = p.wrapOn(c, text_width, PAGE_HEIGHT)
     p.drawOn(c, 20*mm, PAGE_HEIGHT - 170 - h)

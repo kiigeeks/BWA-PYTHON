@@ -32,7 +32,7 @@ PROMPT_TEMPLATES = {
     "prompt_step1_deep_analysis_and_score": """
         Anda adalah seorang ahli psikologi industri dan organisasi (PIO) senior.
         
-        TUGAS: Lakukan analisis MENTAH yang sangat detail dalam format poin-poin. JANGAN MENULIS PARAGRAF. Di akhir, berikan penilaian skor mentah dari 1 (sangat tidak cocok) hingga 10 (sangat cocok) beserta justifikasinya.
+        TUGAS: Lakukan analisis MENTAH yang sangat detail dalam format poin-poin. JANGAN MENULIS PARAGRAF. Di akhir, berikan penilaian skor mentah dari 1 (sangat tidak sesuai) hingga 10 (sangat sesuai) beserta justifikasinya.
         
         PROFIL KANDIDAT:
         - Kepribadian: {tipe_kepribadian}
@@ -50,16 +50,16 @@ PROMPT_TEMPLATES = {
         5.  **Justifikasi Skor:** [Jelaskan secara singkat mengapa Anda memberikan skor tersebut, dengan mempertimbangkan keseimbangan sinergi vs risiko]
         """,
 
-        # LANGKAH 2: PENENTUAN LABEL KECOCOKAN
+        # LANGKAH 2: PENENTUAN LABEL KESESUAIAN
         "prompt_step2_determine_level": """
         Anda adalah seorang quality control analyst.
         
-        TUGAS: Berdasarkan analisis dan skor di bawah, pilih SATU label yang paling sesuai dari tiga opsi berikut: "Sangat Cocok", "Cocok dengan Catatan Pengembangan", "Kurang Cocok".
+        TUGAS: Berdasarkan analisis dan skor di bawah, pilih SATU label yang paling sesuai dari tiga opsi berikut: "Sangat Sesuai", "Sesuai dengan Catatan Pengembangan", "Kurang Sesuai".
         
         PANDUAN PEMILIHAN LABEL:
-        - Skor 8-10: Pilih "Sangat Cocok"
-        - Skor 5-7: Pilih "Cocok dengan Catatan Pengembangan"
-        - Skor 1-4: Pilih "Kurang Cocok"
+        - Skor 8-10: Pilih "Sangat Sesuai"
+        - Skor 5-7: Pilih "Sesuai dengan Catatan Pengembangan"
+        - Skor 1-4: Pilih "Kurang Sesuai"
         
         ANALISIS UNTUK DIEVALUASI:
         ---
@@ -73,11 +73,11 @@ PROMPT_TEMPLATES = {
         "prompt_step3_write_narrative": """
         Anda adalah seorang penulis laporan psikologi industri senior yang ahli dalam menyusun analisis yang mendalam dan actionable.
 
-        TUGAS: Tulis **DUA PARAGRAF** executive summary yang komprehensif dan profesional berdasarkan analisis mentah dan label kecocokan yang sudah ditentukan.
+        TUGAS: Tulis **DUA PARAGRAF** executive summary yang komprehensif dan profesional berdasarkan analisis mentah dan label kesesuaian yang sudah ditentukan.
 
         ======================================
         DATA UNTUK DITULIS:
-        - Label Kecocokan yang Telah Ditentukan: "{determined_level}"
+        - Label Kesesuaian yang Telah Ditentukan: "{determined_level}"
         - Analisis Mentah Lengkap:
         ---
         {deep_analysis_and_score}
@@ -86,8 +86,8 @@ PROMPT_TEMPLATES = {
 
         INSTRUKSI PENULISAN WAJIB:
 
-        **Paragraf 1: FOKUS PADA DIAGNOSIS KECOCOKAN**
-        1.  Awali dengan menyatakan level kecocokan yang telah ditentukan (Contoh: "Berdasarkan analisis profil, individu ini dinilai **{determined_level}** untuk posisi...").
+        **Paragraf 1: FOKUS PADA DIAGNOSIS KESESUAIAN**
+        1.  Awali dengan menyatakan level kesesuaian yang telah ditentukan (Contoh: "Berdasarkan analisis profil, individu ini dinilai **{determined_level}** untuk posisi...").
         2.  Jelaskan **kekuatan utama** (sinergi positif) yang mendukung penilaian tersebut. Kaitkan langsung dengan tugas-tugas spesifik pada posisi yang dilamar.
         3.  Jelaskan secara **detail dan eksplisit mengenai Potensi Konflik/Risiko**. Uraikan MENGAPA kelemahan tersebut menjadi masalah signifikan untuk peran ini. Jangan hanya menyebutkan kelemahannya, tetapi jelaskan **dampaknya** pada performa kerja.
 
@@ -147,12 +147,12 @@ PROMPT_TEMPLATES = {
         **ATURAN MUTLAK:**
         - Jangan gunakan format poin-poin. Semua harus dalam bentuk paragraf naratif.
         - Gunakan format bold `**teks**` untuk menyorot istilah kunci.
-        - JANGAN sebutkan "pekerjaan", "posisi", "jabatan", atau "kecocokan".
+        - JANGAN sebutkan "pekerjaan", "posisi", "jabatan", atau "kesesuaian".
         - OUTPUT HARUS TEPAT DUA PARAGRAF.
         """,
 
         "person_job_fit_full": """
-        Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja yang cocok berdasarkan profil kandidat dengan format yang spesifik dan terstruktur.
+        Anda adalah seorang analis karir ahli. Tugas Anda adalah membuat analisis rekomendasi bidang kerja yang sesuai berdasarkan profil kandidat dengan format yang spesifik dan terstruktur.
 
         ==============================
         **TEMPLATE FORMAT YANG HARUS DIIKUTI PERSIS:**
@@ -161,22 +161,22 @@ PROMPT_TEMPLATES = {
         Individu dengan kepribadian [KEPRIBADIAN] dan kemampuan [KOGNITIF] akan optimal dalam pekerjaan yang membutuhkan [sebutkan karakteristik kerja yang spesifik sesuai profil]. Berikut adalah beberapa bidang kerja yang sesuai:
         
         **[Nama Kategori Bidang 1]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini sesuai, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 2]**  
-        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini sesuai, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 3]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini sesuai, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 4]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini sesuai, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
         
         **[Nama Kategori Bidang 5]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini sesuai, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
 
         **[Nama Kategori Bidang 6]**
-        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini cocok, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
+        [Job Title 1], [Job Title 2]. [Penjelasan 1-2 kalimat mengapa bidang ini sesuai, bagaimana kepribadian dan kognitif dimanfaatkan dalam pekerjaan tersebut, serta contoh tugas spesifik].
 
         **SEKARANG, TUGAS ANDA:**
         Buatlah analisis rekomendasi pekerjaan untuk profil di bawah ini menggunakan format template di atas SECARA PERSIS.
@@ -194,7 +194,7 @@ PROMPT_TEMPLATES = {
         - Langsung lanjut dengan penjelasan dalam 1 paragraf (1-2 kalimat)
         4. **BERIKAN 5 KATEGORI** bidang kerja yang berbeda dan spesifik
         5. **PENJELASAN SETIAP KATEGORI HARUS**:
-        - Menjelaskan mengapa cocok dengan profil
+        - Menjelaskan mengapa sesuai dengan profil
         - Menyebutkan bagaimana kepribadian digunakan
         - Menyebutkan bagaimana kemampuan kognitif dimanfaatkan
         - Memberikan contoh tugas atau situasi kerja spesifik
@@ -208,7 +208,7 @@ PROMPT_TEMPLATES = {
 def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text):
     """
     Menghasilkan executive summary secara dinamis.
-    Jika 'pekerjaan' ada, buat analisis kecocokan.
+    Jika 'pekerjaan' ada, buat analisis kesesuaian.
     Jika tidak, buat profil psikologis umum.
     """
     # Ekstrak konteks yang relevan dari bank data
@@ -218,8 +218,8 @@ def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, mode
     final_narrative = "Konten Executive Summary gagal digenerate."
 
     if pekerjaan:
-        # JIKA PEKERJAAN ADA: Lakukan proses 3 langkah untuk analisis kecocokan
-        print(f"   -> Pekerjaan '{pekerjaan}' terdeteksi. Menjalankan analisis kecocokan (3 langkah)...")
+        # JIKA PEKERJAAN ADA: Lakukan proses 3 langkah untuk analisis kesesuaian
+        print(f"   -> Pekerjaan '{pekerjaan}' terdeteksi. Menjalankan analisis kesesuaian (3 langkah)...")
         
         # Langkah 1: Analisis & Skor
         prompt_step1 = PROMPT_TEMPLATES["prompt_step1_deep_analysis_and_score"].format(
