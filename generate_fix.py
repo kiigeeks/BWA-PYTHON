@@ -11,11 +11,17 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import Color, black
+from reportlab.lib import colors
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
 from behavior_traits_data import BEHAVIOR_TRAITS_BANK
 from cognitive_traits_data import COGNITIVE_TRAITS_BANK
+from reportlab.lib.units import mm, cm
+from reportlab.lib.colors import Color, black, lightblue, white, grey, whitesmoke
+from reportlab.platypus import Paragraph, Table, TableStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
 
 
 # ==============================================================================
@@ -202,7 +208,51 @@ PROMPT_TEMPLATES = {
         7. **JANGAN** gunakan bullet points, numbering, atau tag HTML
         8. **KONSISTENSI**: Ikuti format template tanpa variasi apapun
         9. **SPESIFIK**: Semua rekomendasi harus logis dan relevan dengan kombinasi kepribadian + kognitif yang diberikan
-     """
+     """,
+     "prompt_job_suitability_table": """
+        ANDA ADALAH SEORANG AHLI PSIKOLOGI DAN ANALIS KARIER YANG OBJEKTIF DAN MENGIKUTI INSTRUKSI DENGAN TEPAT.
+        Tugas Anda adalah memberikan analisis yang mendalam dan seimbang. Gunakan informasi ilmiah di bawah ini sebagai referensi utama.
+
+        ---
+        INFORMASI PENDUKUNG (REFERENSI)
+        ---
+
+        {extracted_info}
+
+        ---
+        TUGAS UTAMA ANDA
+        ---
+
+        Lakukan analisis kecocokan yang seimbang dan *spesifik* untuk pekerjaan: '{job}'.
+
+        Input:
+        - Pekerjaan: {job}
+        - Personality: {personality}
+        - Tes Kognitif: {cognitive}
+
+        Ikuti Langkah Ini Dengan Tepat:
+        1.  Tentukan 4-6 kompetensi utama yang *spesifik dan relevan* untuk '{job}'. (DILARANG menggunakan nama generik seperti 'Kompetensi A').
+        2.  Untuk setiap kompetensi, berikan skor persentase kecocokan (0-100) untuk 'Personality' dan 'Tes Kognitif'.
+        3.  Hitung rata-rata kesesuaian (%) untuk setiap kompetensi.
+        4.  Isi kolom 'Interpretasi'. Kolom ini WAJIB dan HANYA BOLEH berisi salah satu dari tiga frasa berikut, berdasarkan nilai rata-rata:
+            - *Sangat Sesuai* (jika rata-rata >= 75%)
+            - *Sesuai* (jika rata-rata antara 50% - 75%)
+            - *Kurang Sesuai* (jika rata-rata < 50%)
+        5.  Sajikan semua hasil dalam SATU tabel markdown. JANGAN tambahkan penjelasan atau kalimat lain di dalam sel tabel.
+        6.  Setelah tabel, buat 'Kesimpulan Singkat' dalam format poin-poin (bullet points) seperti contoh. Anda HARUS MENGHITUNG RATA-RATA UMUM dari semua kompetensi.
+
+        ---
+        FORMAT OUTPUT AKHIR (IKUTI DENGAN TEPAT)
+        ---
+
+        ### Analisis Kecocokan untuk: {job}
+
+        | Kompetensi Utama | {personality} (%) | {cognitive} (%) | Rata-rata Kesesuaian (%) | Interpretasi |
+        | :--- | :---: | :---: | :---: | :--- |
+        | (Nama Kompetensi 1 yang spesifik) | (Skor) | (Skor) | (Rata-rata) | (Sangat Sesuai / Sesuai / Kurang Sesuai) |
+        | (Nama Kompetensi 2 yang spesifik) | (Skor) | (Skor) | (Rata-rata) | (Sangat Sesuai / Sesuai / Kurang Sesuai) |
+        | (Nama Kompetensi 3 yang spesifik) | (Skor) | (Skor) | (Rata-rata) | (Sangat Sesuai / Sesuai / Kurang Sesuai) |
+        """
 }
 
 def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text):
@@ -271,12 +321,15 @@ def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, mode
 def extract_relevant_data(full_text, keywords):
     """
     Mengekstrak bagian teks yang relevan dari bank_data berdasarkan daftar keyword.
+    Versi ini disempurnakan dari generate_kecocokan.py
     """
     all_headings = [
-        "Openess", "Conscientiousness", "Extraversion",
+        "Openness", "Openess", "Conscientiousness", "Extraversion",
         "Agreeableness", "Neuroticism", "Kraepelin Test (Numerik)",
         "WCST (Logika)", "Digit Span (Short Term Memory)", "EXECUTIVE SUMMARY"
     ]
+    # Koreksi otomatis untuk variasi penulisan "Openess"
+    full_text = full_text.replace("Openess \n", "Openness\n")
 
     extracted_chunks = []
     for keyword in keywords:
@@ -284,6 +337,7 @@ def extract_relevant_data(full_text, keywords):
             start_index = full_text.index(keyword)
             end_index = len(full_text)
             for heading in all_headings:
+                # Cari heading berikutnya sebagai batas akhir section
                 found_pos = full_text.find(heading, start_index + 1)
                 if found_pos != -1:
                     end_index = min(end_index, found_pos)
@@ -292,6 +346,49 @@ def extract_relevant_data(full_text, keywords):
         except ValueError:
             print(f"Peringatan: Keyword '{keyword}' tidak ditemukan di bank_data.txt")
     return "\n\n".join(extracted_chunks)
+
+def parse_markdown_table(table_text: str):
+    """
+    Parse tabel markdown menjadi list of lists, mengabaikan baris separator.
+    """
+    rows = table_text.strip().split("\n")
+    parsed = []
+    for row in rows:
+        if row.strip().startswith("|"):
+            parts = [cell.strip() for cell in row.split("|")[1:-1]]
+            if all(re.match(r"^:?-{3,}:?$", p) for p in parts):
+                continue
+            if any(p for p in parts):
+                parsed.append(parts)
+    if len(parsed) > 1:
+        return parsed[1:]
+    return []
+
+
+def generate_suitability_analysis(pekerjaan, tipe_kepribadian, kognitif_utama_key, model_ai, bank_data_text):
+    """
+    Fungsi terintegrasi untuk menghasilkan data tabel kecocokan pekerjaan.
+    """
+    print("   -> Memulai analisis kecocokan untuk tabel...")
+    keywords = [tipe_kepribadian, kognitif_utama_key]
+    extracted_data = extract_relevant_data(bank_data_text, keywords)
+    
+    prompt = PROMPT_TEMPLATES["prompt_job_suitability_table"].format(
+        job=pekerjaan,
+        personality=tipe_kepribadian,
+        cognitive=kognitif_utama_key,
+        extracted_info=extracted_data
+    )
+    
+    markdown_output = generate_ai_content(prompt, model=model_ai, task_name="Analisis Tabel Kecocokan")
+    
+    if "Error:" in markdown_output:
+        print(f"   -- Gagal membuat tabel kecocokan. Respon: {markdown_output}")
+        return []
+
+    table_data = parse_markdown_table(markdown_output)
+    print("   -- Analisis tabel kecocokan berhasil dibuat dan diparsing.")
+    return table_data
 
 
 def generate_ai_content(prompt, model="llama3.1:8b", task_name="AI Task"):
@@ -437,8 +534,59 @@ def halaman_1_cover(c, biodata, executive_summary_text, page_num):
     draw_footer(c, page_num)
     c.showPage()
 
+def halaman_2_kecocokan(c, table_data, page_num, personality_name, cognitive_name, job_name):
+    draw_watermark(c, "cia_watermark.png")
+    draw_header(c)
+    
+    y_start = PAGE_HEIGHT - 140
+    c.setFont("Times-Bold", 12)
+    c.drawString(60, y_start, f"ANALISIS KECOCOKAN UNTUK: {job_name.upper()}")
+    
+    cell_style = ParagraphStyle(
+        "TableCell",
+        fontSize=9,
+        leading=11,
+        wordWrap="CJK"
+    )
+    
+    headers = [
+        Paragraph("Kompetensi Utama", cell_style),
+        Paragraph(f"{personality_name} (%)", cell_style),
+        Paragraph(f"{cognitive_name} (%)", cell_style),
+        Paragraph("Rata-rata Kesesuaian (%)", cell_style),
+        Paragraph("Interpretasi", cell_style),
+    ]
+    
+    data_for_table = [headers]
+    for row in table_data:
+        wrapped_row = [Paragraph(str(cell), cell_style) for cell in row]
+        data_for_table.append(wrapped_row)
+        
+    # --- PERBAIKAN: Lebar kolom disesuaikan agar totalnya pas 18 cm ---
+    col_widths = [5*cm, 3*cm, 3*cm, 3*cm, 3*cm]
+    
+    table = Table(data_for_table, colWidths=col_widths)
+    
+    table_style = TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightblue),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('ALIGN', (1,1), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('FONTNAME', (0,0), (-1,0), 'Times-Bold'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
+    ])
+    
+    table.setStyle(table_style)
+    
+    w, h = table.wrapOn(c, PAGE_WIDTH - 120, y_start)
+    table.drawOn(c, 60, y_start - h - 10)
+    
+    draw_footer(c, page_num)
+    c.showPage()
+    return page_num + 1
 
-def halaman_2(c, behavior_traits_text, topoplot1, judul_topoplot1, page_num):
+def halaman_3_behavior(c, behavior_traits_text, topoplot1, judul_topoplot1, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
@@ -451,25 +599,20 @@ def halaman_2(c, behavior_traits_text, topoplot1, judul_topoplot1, page_num):
         leading=14, alignment=TA_JUSTIFY
     )
 
-    # Gambar topoplot
     y_topoplot = y_start - 40
     y_after_topoplot = draw_centered_image(c, topoplot1, y_topoplot, 180)
 
-    # Judul topoplot
     judul_para = Paragraph(judul_topoplot1, style)
     max_text_width = PAGE_WIDTH - 2 * 60
     w_judul, h_judul = judul_para.wrap(max_text_width, PAGE_HEIGHT)
     y_judul = y_after_topoplot - h_judul - 10
     judul_para.drawOn(c, 60, y_judul)
 
-    # Teks panjang dipotong per halaman
-    available_height = y_judul - 80  # sisakan space ke footer
+    available_height = y_judul - 80
     lines = behavior_traits_text.split('\n') if '\n' in behavior_traits_text else behavior_traits_text.split('. ')
     current_text = ""
     text_parts = []
-    temp_para = Paragraph("", style)
-    h_accum = 0
-
+    
     for line in lines:
         temp_para = Paragraph(current_text + line + " ", style)
         _, h = temp_para.wrap(max_text_width, available_height)
@@ -481,27 +624,28 @@ def halaman_2(c, behavior_traits_text, topoplot1, judul_topoplot1, page_num):
     if current_text:
         text_parts.append(current_text.strip())
 
-    # Gambar paragraf pertama di halaman pertama
     first_para = Paragraph(text_parts[0], style)
     w, h = first_para.wrap(max_text_width, available_height)
     first_para.drawOn(c, 60, y_judul - h - 20)
     draw_footer(c, page_num)
     c.showPage()
-
-    # Halaman berikutnya
-    for i, part in enumerate(text_parts[1:], start=1):
+    
+    current_page_number = page_num + 1
+    for part in text_parts[1:]:
         draw_watermark(c, "cia_watermark.png")
         draw_header(c)
-        y_start = PAGE_HEIGHT - 100
-        c.setFont("Times-Bold", 12)
         para = Paragraph(part, style)
         w, h = para.wrap(max_text_width, PAGE_HEIGHT - 150)
         para.drawOn(c, 60, PAGE_HEIGHT - 150 - h)
-        draw_footer(c, page_num + i)
+        draw_footer(c, current_page_number)
         c.showPage()
+        current_page_number += 1
+    
+    # --- PERBAIKAN: TAMBAHKAN BARIS RETURN DI BAWAH INI ---
+    return current_page_number
 
 
-def halaman_4(c, cognitive_traits_text, topoplot2, judul_topoplot2, page_num):
+def halaman_cognitive(c, cognitive_traits_text, topoplot2, judul_topoplot2, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
@@ -616,44 +760,34 @@ def halaman_5(c, cognitive_traits_text_2,  page_num):
     draw_footer(c, page_num)
     c.showPage()
 
-
 def halaman_person_fit_job(c, person_fit_job_text, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
-    # Judul
     y_pos = PAGE_HEIGHT - 140
     c.setFont("Times-Bold", 12)
     c.drawString(60, y_pos, "PERSON TO FIT BIDANG KERJA/USAHA")
     
-    # Beri sedikit jarak setelah judul
     y_pos -= 15
 
-    # Definisikan style untuk paragraf yang akan merender HTML
     style = ParagraphStyle(
-        name="JobFitStyle",
-        fontName="Times-Roman",
-        fontSize=12,
-        leading=16,  # Beri jarak antar baris yang cukup
-        alignment=TA_JUSTIFY,
-        spaceAfter=6
+        name="JobFitStyle", fontName="Times-Roman", fontSize=12,
+        leading=16, alignment=TA_JUSTIFY, spaceAfter=6
     )
 
-    # Buat objek Paragraph dari teks yang dihasilkan AI
-    # Objek ini akan menginterpretasikan tag <b> dan <br/>
     p = Paragraph(person_fit_job_text, style)
 
-    # Tentukan lebar area teks dan gambar ke kanvas
     margin_horizontal = 60
     text_width = PAGE_WIDTH - (2 * margin_horizontal)
     
-    # Hitung tinggi yang dibutuhkan dan gambar paragrafnya
     w, h = p.wrapOn(c, text_width, y_pos)
     p.drawOn(c, margin_horizontal, y_pos - h)
 
     draw_footer(c, page_num)
     c.showPage()
-
+    
+    # --- PERBAIKAN: TAMBAHKAN BARIS RETURN DI BAWAH INI ---
+    return page_num + 1
 
 def format_underline_links(text):
     return re.sub(
@@ -662,66 +796,51 @@ def format_underline_links(text):
         text
     )
 
-def halaman_8(c, referensi_text_1, page_num):
-    y_position = PAGE_HEIGHT - 150  # awal di bawah judul
-    left_margin = 60
-    right_margin = 60
-    line_spacing = 5
+def halaman_referensi(c, referensi_text_1, page_num):
+    y_position = PAGE_HEIGHT - 150
+    left_margin, right_margin, line_spacing = 60, 60, 5
 
-    # Style hanging indent + support link underline
     style = ParagraphStyle(
-        name="JustifySmall",
-        fontName="Times-Roman",
-        fontSize=11.5,
-        leading=14,
-        alignment=TA_JUSTIFY,
-        leftIndent=20,
-        firstLineIndent=-20,
-        spaceAfter=8,
-        underlineWidth=0.4,
+        name="JustifySmall", fontName="Times-Roman", fontSize=11.5,
+        leading=14, alignment=TA_JUSTIFY, leftIndent=20,
+        firstLineIndent=-20, spaceAfter=8, underlineWidth=0.4,
         underlineOffset= -2.5    
     )
 
-    # Format semua link dalam referensi jadi underline biru
     referensi_text_1 = format_underline_links(referensi_text_1)
 
-    # Gambar header dan judul
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
     c.setFont("Times-Bold", 12)
     c.drawCentredString(PAGE_WIDTH / 2, y_position, "Referensi")
-    y_position -= 15  # Jarak dari judul ke teks
+    y_position -= 15
 
-    # Pecah berdasarkan double newline antar referensi
     referensi_list = referensi_text_1.strip().split("\n\n")
     max_width = PAGE_WIDTH - left_margin - right_margin
-
+    current_page_number = page_num
+    
     for ref in referensi_list:
         ref_paragraph = Paragraph(ref.replace("\n", " "), style)
         w, h = ref_paragraph.wrap(max_width, PAGE_HEIGHT)
 
-        # Jika tidak muat di halaman sekarang, pindah halaman
         if y_position - h < 80:
-            draw_footer(c, page_num)
+            draw_footer(c, current_page_number)
             c.showPage()
-            page_num += 1
-
-            # --- RESET HEADER HALAMAN BARU ---
+            current_page_number += 1
             draw_watermark(c, "cia_watermark.png")
             draw_header(c)
             y_position = PAGE_HEIGHT - 140
 
-        # Gambar referensi
         ref_paragraph.drawOn(c, left_margin, y_position - h)
         y_position -= h + line_spacing
 
-    # Footer terakhir
-    draw_footer(c, page_num)
+    draw_footer(c, current_page_number)
     c.showPage()
-
     
+    # --- PERBAIKAN: TAMBAHKAN BARIS RETURN DI BAWAH INI ---
+    return current_page_number + 1
 
-def halaman_11(c, disclaimer_text, page_num):
+def halaman_disclaimer(c, disclaimer_text, page_num):
     draw_watermark(c, "cia_watermark.png")
     draw_header(c)
 
@@ -729,44 +848,25 @@ def halaman_11(c, disclaimer_text, page_num):
     c.setFillColor(black)
     c.drawString(20 * mm, PAGE_HEIGHT - 150, "Disclaimer")
 
-    # Margin untuk area teks
-    left_margin = 20 * mm
-    right_margin = 20 * mm
-    top_margin = PAGE_HEIGHT - 170 # Posisi Y untuk bagian atas paragraf
-    
-    # Lebar area yang tersedia untuk teks
+    left_margin, right_margin, top_margin = 20 * mm, 20 * mm, PAGE_HEIGHT - 170
     text_width = PAGE_WIDTH - left_margin - right_margin
     
-    # Buat style untuk paragraf: rata kiri-kanan (justify)
     style = ParagraphStyle(
-        name='Justified',
-        fontName='Times-Roman',
-        fontSize=10,
-        leading=15,  # Jarak antar baris
-        alignment=TA_JUSTIFY,
-        underlineColor=None,
-        underlineWidth=0.4,
+        name='Justified', fontName='Times-Roman', fontSize=10,
+        leading=15, alignment=TA_JUSTIFY, underlineWidth=0.4,
         underlineOffset= -2.5    
     )
     
-    # Ganti spasi biasa dengan spasi yang lebih 'fleksibel' untuk justifikasi yang lebih baik
-    # dan ubah kalimat-kalimat terpisah menjadi satu blok teks
     text_for_paragraph = disclaimer_text.replace('\n', ' ').replace('  ', ' ')
-    
-    # Buat objek Paragraf
     p = Paragraph(text_for_paragraph, style)
-    
-    # Hitung tinggi yang dibutuhkan oleh paragraf dan gambar ke kanvas
-    w, h = p.wrapOn(c, text_width, PAGE_HEIGHT) # wrapOn untuk kalkulasi
-    p.drawOn(c, left_margin, top_margin - h) # drawOn untuk menggambar
-
-    c.setFont("Times-Bold", 10)
-    c.setFillColorRGB(0.6, 0.6, 0.6)
+    w, h = p.wrapOn(c, text_width, PAGE_HEIGHT)
+    p.drawOn(c, left_margin, top_margin - h)
 
     draw_footer(c, page_num)
     c.showPage()
 
-
+    # --- PERBAIKAN: TAMBAHKAN BARIS RETURN DI BAWAH INI ---
+    return page_num + 1
 
 # ==============================================================================
 # BAGIAN 5: FUNGSI UTAMA GENERATOR LAPORAN
@@ -1057,27 +1157,56 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     # --------------------------------------------------------------------------
     print(f"\n--- Memulai Pembuatan PDF: {nama_file_output} ---")
     c = canvas.Canvas(nama_file_output, pagesize=A4)
+    
+    # Inisialisasi nomor halaman
+    next_page_num = 1
+    
+    # Halaman 1: Cover & Executive Summary
+    halaman_1_cover(c, biodata_kandidat, executive_summary_formatted, page_num=next_page_num)
+    next_page_num += 1
 
-    # Memanggil fungsi untuk setiap halaman dengan penomoran yang benar
-    halaman_1_cover(c, biodata_kandidat, executive_summary_formatted, page_num=1)
-    halaman_2(c, behavior_traits_text, topoplot_path_behaviour, judul_topoplot1, page_num=2)
-    halaman_4(c, cognitive_traits_text, topoplot_path_cognitive, judul_topoplot2, page_num=4)
-    halaman_person_fit_job(c, person_fit_job_formatted, page_num=6)
-    halaman_8(c, referensi_text_1, page_num=7) 
-    halaman_11(c, disclaimer_text, page_num=12) 
+    # --- BLOK KONDISIONAL UNTUK TABEL KECOCOKAN ---
+    if pekerjaan and pekerjaan.strip():
+        print("3. Membuat tabel kecocokan pekerjaan...")
+        table_data = generate_suitability_analysis(
+            pekerjaan, tipe_kepribadian, kognitif_utama_key, model_ai, bank_data
+        )
+        if table_data:
+            # Halaman 2: Tabel Kecocokan
+            next_page_num = halaman_2_kecocokan(
+                c, table_data, page_num=next_page_num,
+                personality_name=tipe_kepribadian,
+                cognitive_name=kognitif_utama_display_name,
+                job_name=pekerjaan
+            )
+        else:
+            print("   -- Gagal membuat data untuk tabel kecocokan, halaman akan dilewati.")
+            
+    # Halaman Berikutnya: Behavior Traits
+    next_page_num = halaman_3_behavior(c, behavior_traits_text, topoplot_path_behaviour, judul_topoplot1, page_num=next_page_num)
+    
+    # Halaman Berikutnya: Cognitive Traits
+    next_page_num = halaman_cognitive(c, cognitive_traits_text, topoplot_path_cognitive, judul_topoplot2, page_num=next_page_num)
+
+    # Halaman Berikutnya: Person-Job Fit
+    next_page_num = halaman_person_fit_job(c, person_fit_job_formatted, page_num=next_page_num)
+    
+    # Halaman Berikutnya: Referensi
+    next_page_num = halaman_referensi(c, referensi_text_1, page_num=next_page_num)
+    
+    # Halaman Terakhir: Disclaimer
+    next_page_num = halaman_disclaimer(c, disclaimer_text, page_num=next_page_num)
 
     c.save()
     print(f"\nPDF '{nama_file_output}' berhasil dibuat!")
 
     return person_fit_job_formatted
 
-
 # ==============================================================================
 # BAGIAN 6: EKSEKUSI SCRIPT (ENTRY POINT)
 # ==============================================================================
 if __name__ == "__main__":
     
-    # Konfigurasi untuk eksekusi langsung dari script ini
     config_tipe_kepribadian = "Openness"
     config_kognitif_utama = "WCST (Logika)" 
     config_pekerjaan = "Tax Accountant"
@@ -1095,12 +1224,14 @@ if __name__ == "__main__":
         "Operator": "Ahmad Marzuki S.Kom"
     }
     
-    # Panggil fungsi utama dengan konfigurasi di atas
+    # Panggil fungsi utama dengan KONFIGURASI LENGKAP
     generate_full_report(
         tipe_kepribadian=config_tipe_kepribadian,
         kognitif_utama_key=config_kognitif_utama,
         pekerjaan=config_pekerjaan,
         model_ai=config_model_ai,
         nama_file_output=config_nama_file,
-        biodata_kandidat=config_biodata
+        biodata_kandidat=config_biodata,
+        topoplot_path_behaviour="topoplot1.png",
+        topoplot_path_cognitive="topoplot2.png"
     )

@@ -1,0 +1,77 @@
+=== PROMPT YANG DIKIRIM ===
+ANDA ADALAH SEORANG AHLI PSIKOLOGI DAN ANALIS KARIER YANG OBJEKTIF DAN MENGIKUTI INSTRUKSI DENGAN TEPAT.
+Tugas Anda adalah memberikan analisis yang mendalam dan seimbang. Gunakan informasi ilmiah di bawah ini sebagai referensi utama.
+
+---
+INFORMASI PENDUKUNG (REFERENSI)
+---
+
+Extraversion 
+Hasil analisis EEG menunjukkan bahwa individu dengan tingkat
+
+Digit Span (Short Term Memory)
+Hasil tes EEG pada stimulus yang menguji memori jangka pendek menunjukkan pola respons elektrofisiologis yang lebih kuat pada gelombang theta dan alpha, yang berhubungan dengan pengolahan informasi jangka pendek. Aktivitas yang lebih dominan terlihat pada kanal-kanal posterior, seperti P3 dan O1, yang terletak di area temporal dan oksipital otak, yang terkait dengan pemrosesan visual dan pengingatan informasi dalam waktu singkat. Penelitian menunjukkan bahwa peningkatan aktivitas gelombang theta di area ini berhubungan dengan pengolahan dan penyimpanan informasi dalam memori jangka pendek (Klimesch, 1996; Basar et al., 2001). Aktivitas ini dapat terjadi saat individu diminta untuk mengingat serangkaian angka atau kata dalam jangka waktu yang terbatas, yang mengindikasikan keterlibatan intens dalam memori jangka pendek.
+Keunggulan utama dari individu dengan kemampuan memori jangka pendek yang tinggi adalah kemampuan untuk mengingat dan memproses informasi dalam waktu yang sangat singkat, yang sangat penting dalam berbagai situasi yang membutuhkan pengambilan keputusan cepat. Penelitian oleh Cowan (2001) menunjukkan bahwa individu dengan kapasitas memori jangka pendek yang lebih besar dapat lebih efisien dalam menyelesaikan tugas-tugas yang membutuhkan pengingatan informasi untuk waktu yang terbatas, seperti dalam percakapan cepat atau saat mengambil keputusan dalam lingkungan yang penuh informasi. Mereka cenderung memiliki kemampuan lebih untuk mengingat instruksi, angka, atau urutan informasi dengan cepat, yang memberikan keunggulan dalam situasi kerja atau pembelajaran yang melibatkan memori aktif.
+Namun, kelemahan utama individu dengan memori jangka pendek yang tinggi adalah keterbatasan dalam mengingat informasi dalam jangka waktu yang lebih lama. Penelitian menunjukkan bahwa meskipun mereka mampu menyimpan dan mengingat informasi dalam waktu singkat, mereka mungkin mengalami kesulitan dalam mempertahankan informasi tersebut dalam jangka panjang, yang berpotensi menghambat kemampuan mereka dalam situasi yang membutuhkan pengingatan informasi secara permanen (Baddeley, 2003). Hal ini dapat mempengaruhi kemampuan mereka untuk mengingat informasi yang telah dipelajari dalam konteks jangka panjang, yang menjadi penting dalam pembelajaran atau pengelolaan informasi yang lebih rumit dan memerlukan integrasi informasi.
+Dalam konteks pengembangan, kemampuan memori jangka pendek dapat ditingkatkan melalui latihan yang menstimulasi proses penyimpanan dan pengambilan informasi dalam jangka waktu singkat. Berbagai teknik pelatihan, seperti latihan ingatan berbasis urutan atau permainan otak yang melibatkan peningkatan kecepatan pengingatan, dapat membantu memperkuat kemampuan memori jangka pendek. Penelitian menunjukkan bahwa pelatihan yang melibatkan pengulangan informasi dalam waktu singkat dapat meningkatkan kapasitas memori jangka pendek (Salthouse, 1996; Jaeggi et al., 2008). Selain itu, latihan yang melibatkan pengolahan informasi dalam konteks yang lebih variatif juga dapat membantu mempercepat pemrosesan informasi dalam memori jangka pendek, sehingga individu menjadi lebih efisien dalam menyelesaikan tugas-tugas yang membutuhkan ketahanan memori.
+Hasil penelitian EEG menunjukkan bahwa kanal-kanal yang terlibat dalam memori jangka pendek, seperti P3 dan O1, berfungsi dalam konteks pengolahan informasi visual dan verbal dalam waktu yang singkat. Peningkatan aktivitas gelombang theta dan alpha di area posterior menunjukkan bahwa otak sedang bekerja untuk memanipulasi informasi yang baru saja diterima dan menyimpannya dalam memori jangka pendek (Vogel et al., 2005). Hal ini sangat penting dalam memahami bagaimana individu dengan memori jangka pendek yang kuat dapat lebih efektif dalam pengambilan keputusan cepat dan dalam situasi yang melibatkan pengingatan informasi dengan durasi singkat.
+
+---
+TUGAS UTAMA ANDA
+---
+
+Lakukan analisis kecocokan yang seimbang dan *spesifik* untuk pekerjaan: 'Informatika'.
+
+Input:
+- Pekerjaan: Informatika
+- Personality: Extraversion
+- Tes Kognitif: Digit Span (Short Term Memory)
+
+Ikuti Langkah Ini Dengan Tepat:
+1.  Tentukan 4-6 kompetensi utama yang *spesifik dan relevan* untuk 'Informatika'. (DILARANG menggunakan nama generik seperti 'Kompetensi A').
+2.  Untuk setiap kompetensi, berikan skor persentase kecocokan (0-100) untuk 'Personality' dan 'Tes Kognitif'.
+3.  Hitung rata-rata kesesuaian (%) untuk setiap kompetensi.
+4.  Isi kolom 'Interpretasi'. Kolom ini WAJIB dan HANYA BOLEH berisi salah satu dari tiga frasa berikut, berdasarkan nilai rata-rata:
+    - *Sangat Sesuai* (jika rata-rata >= 75%)
+    - *Sesuai* (jika rata-rata antara 50% - 75%)
+    - *Kurang Sesuai* (jika rata-rata < 50%)
+5.  Sajikan semua hasil dalam SATU tabel markdown. JANGAN tambahkan penjelasan atau kalimat lain di dalam sel tabel.
+6.  Setelah tabel, buat 'Kesimpulan Singkat' dalam format poin-poin (bullet points) seperti contoh. Anda HARUS MENGHITUNG RATA-RATA UMUM dari semua kompetensi.
+
+---
+FORMAT OUTPUT AKHIR (IKUTI DENGAN TEPAT)
+---
+
+### Analisis Kecocokan untuk: Informatika
+
+| Kompetensi Utama | Extraversion (%) | Digit Span (Short Term Memory) (%) | Rata-rata Kesesuaian (%) | Interpretasi |
+| :--- | :---: | :---: | :---: | :--- |
+| (Nama Kompetensi 1 yang spesifik) | (Skor) | (Skor) | (Rata-rata) | (Sangat Sesuai / Sesuai / Kurang Sesuai) |
+| (Nama Kompetensi 2 yang spesifik) | (Skor) | (Skor) | (Rata-rata) | (Sangat Sesuai / Sesuai / Kurang Sesuai) |
+| (Nama Kompetensi 3 yang spesifik) | (Skor) | (Skor) | (Rata-rata) | (Sangat Sesuai / Sesuai / Kurang Sesuai) |
+
+---
+
+*Kesimpulan Singkat:*
+
+* *Rata-rata umum kesesuaian:* (Hitung dan tulis rata-rata dari semua kompetensi di tabel dalam format XX,X%)
+* *Kategori:* (Tentukan kategori umum berdasarkan rata-rata tersebut, contoh: Sesuai cenderung Sangat Sesuai)
+* (Tuliskan satu kalimat tentang kekuatan utama, menghubungkan trait 'Extraversion' dan 'Digit Span (Short Term Memory)' dengan aspek pekerjaan 'Informatika')
+* (Tuliskan satu kalimat tentang area pengembangan atau potensi kelemahan berdasarkan analisis trait)
+
+=== HASIL DARI MODEL ===
+Analisis Kecocokan untuk: Informatika
+
+| Kompetensi Utama | Extraversion (%) | Digit Span (Short Term Memory) (%) | Rata-rata Kesesuaian (%) | Interpretasi |
+| :--- | :---: | :---: | :---: | :--- |
+| Analisis Data yang Efektif dan Fleksibel | 85 | 90 | 87.5 | Sangat Sesuai |
+| Kemampuan Menginteraksi dengan Tim Sama Waktu Membuat Keputusan Cepat dalam Situasi Darurat | 70 | 80 | 75 | Kurang Sesuai |
+| Pemahaman yang Baik tentang Berbagai Sistem Informasi dan Teknologi | 60 | 65 | 62.5 | Kurang Sesuai |
+| Kemampuan Mengembangkan Solusi Inovatif untuk Masalah yang Kompleks | 55 | 50 | 52.5 | Kurang Sesuai |
+| Kemampuan Analisis Logika dan Pengambilan Keputusan yang Baik dalam Situasi yang Tidak Pasti | 65 | 75 | 70 | Kurang Sesuai |
+
+*Kesimpulan Singkat:*
+* *Rata-rata umum kesesuaian:* 69.7%
+* *Kategori:* Kurang Sesuai
+* Kombinasi kekuatan utama dari 'Extraversion' yang menunjukkan kemampuan untuk menginteraksi dengan tim dan membuat keputusan cepat dalam situasi darurat, bersama dengan kemampuan memori jangka pendek yang kuat di 'Digit Span (Short Term Memory)' sangat berguna dalam pekerjaan 'Informatika', terutama ketika harus menganalisis data efektif dan fleksibel.
+* Potensi kelemahan dapat dideteksi dari analisis trait ini, yaitu memerlukan perhatian lebih untuk mengembangkan kemampuan untuk menginteraksi dengan tim dan membuat keputusan cepat dalam situasi darurat serta menyesuaikan kemampuan memori jangka pendek yang tinggi.
