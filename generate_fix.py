@@ -255,7 +255,7 @@ PROMPT_TEMPLATES = {
         """
 }
 
-def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text):
+def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text, determined_level_from_table=None):
     """
     Menghasilkan executive summary secara dinamis.
     Jika 'pekerjaan' ada, buat analisis kesesuaian.
@@ -268,29 +268,35 @@ def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, mode
     final_narrative = "Konten Executive Summary gagal digenerate."
 
     if pekerjaan:
-        # JIKA PEKERJAAN ADA: Lakukan proses 3 langkah untuk analisis kesesuaian
-        print(f"   -> Pekerjaan '{pekerjaan}' terdeteksi. Menjalankan analisis kesesuaian (3 langkah)...")
+        # JIKA PEKERJAAN ADA: Lakukan analisis kesesuaian
+        print(f"   -> Pekerjaan '{pekerjaan}' terdeteksi. Menjalankan analisis kesesuaian...")
         
-        # Langkah 1: Analisis & Skor
+        # Langkah 1: Analisis & Skor Mentah
         prompt_step1 = PROMPT_TEMPLATES["prompt_step1_deep_analysis_and_score"].format(
             specific_context=specific_context, tipe_kepribadian=tipe_kepribadian, pekerjaan=pekerjaan, kognitif_utama=kognitif_utama)
         deep_analysis_output = generate_ai_content(prompt_step1, model=model_ai, task_name="ES - Analisis & Skor")
         
         if "Error:" not in deep_analysis_output:
-            # Langkah 2: Penentuan Level
-            prompt_step2 = PROMPT_TEMPLATES["prompt_step2_determine_level"].format(deep_analysis_and_score=deep_analysis_output)
-            determined_level = generate_ai_content(prompt_step2, model=model_ai, task_name="ES - Penentuan Level").strip()
+            determined_level = ""
+            # --- PERUBAHAN 1: Gunakan level dari tabel jika tersedia ---
+            if determined_level_from_table:
+                print(f"   -- Level kesesuaian diambil dari rata-rata tabel: '{determined_level_from_table}'")
+                determined_level = determined_level_from_table
+            else:
+                # Jalur fallback: Jika tidak ada data tabel, biarkan AI yang menentukan level
+                print("   -- Menentukan level kesesuaian via AI (jalur fallback)...")
+                prompt_step2 = PROMPT_TEMPLATES["prompt_step2_determine_level"].format(deep_analysis_and_score=deep_analysis_output)
+                determined_level = generate_ai_content(prompt_step2, model=model_ai, task_name="ES - Penentuan Level").strip()
             
             if "Error:" not in determined_level and determined_level:
-                # Langkah 3: Penulisan Narasi
+                # Langkah 3: Penulisan Narasi Final
                 prompt_step3 = PROMPT_TEMPLATES["prompt_step3_write_narrative"].format(
                     determined_level=determined_level, deep_analysis_and_score=deep_analysis_output)
                 final_narrative = generate_ai_content(prompt_step3, model=model_ai, task_name="ES - Penulisan Narasi")
     else:
-        # JIKA PEKERJAAN KOSONG: Lakukan proses 1 langkah untuk ringkasan umum
+        # JIKA PEKERJAAN KOSONG: Lakukan proses untuk ringkasan umum (tidak berubah)
         print("   -> Pekerjaan tidak diisi. Menjalankan summary profil umum (2 langkah)...")
         
-        # Langkah 1: Buat analisis mentah terlebih dahulu
         prompt_analysis = PROMPT_TEMPLATES["prompt_general_analysis"].format(
             tipe_kepribadian=tipe_kepribadian,
             kognitif_utama=kognitif_utama,
@@ -299,21 +305,19 @@ def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, mode
         general_analysis_output = generate_ai_content(prompt_analysis, model=model_ai, task_name="ES - Analisis Profil Umum")
 
         if "Error:" not in general_analysis_output:
-            # Langkah 2: Tulis ulang analisis mentah menjadi narasi
             prompt_narrative = PROMPT_TEMPLATES["prompt_general_narrative"].format(
                 general_analysis_output=general_analysis_output
             )
             final_narrative = generate_ai_content(prompt_narrative, model=model_ai, task_name="ES - Penulisan Narasi Profil Umum")
         else:
-            final_narrative = general_analysis_output # Jika langkah 1 gagal, tampilkan errornya
+            final_narrative = general_analysis_output
 
-    # Format hasil akhir dari Markdown (**teks**) ke HTML (<b>teks</b>)
     if "Error:" not in final_narrative:
         final_narrative = final_narrative.replace('**Executive Summary**', '').strip()                  
         return re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', final_narrative)
     else:
         return final_narrative
-
+    
 # ==============================================================================
 # BAGIAN 3: FUNGSI GENERASI KONTEN AI
 # (Tidak ada perubahan di bagian ini)
@@ -1107,6 +1111,57 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
         'hasil yang konsisten potensi EEG sebagai alat yang kuat dalam analisis psikologis.'
     )
 
+    table_data = []
+    overall_suitability_level = None # Variabel untuk menyimpan level hasil klasifikasi
+
+    print("\n--- Memulai Analisis Pra-Laporan ---")
+    if pekerjaan and pekerjaan.strip():
+        print("1. Membuat tabel kecocokan untuk menentukan level kesesuaian...")
+        table_data = generate_suitability_analysis(
+            pekerjaan, tipe_kepribadian, kognitif_utama_key, model_ai, bank_data
+        )
+
+        # --- BLOK YANG DIPERBARUI: KONVERSI MARKDOWN KE HTML UNTUK TABEL ---
+        if table_data:
+            print("   -- Mengonversi format markdown (bold & newline) di kolom 'Kompetensi Utama' ke HTML...")
+            for row in table_data:
+                # Cek untuk memastikan baris tidak kosong
+                if len(row) > 0:
+                    # Ambil teks asli dari kolom kompetensi
+                    kompetensi_md = row[0]
+                    
+                    # Langkah 1: Ganti newline (\n) dengan tag <br/>
+                    kompetensi_html = kompetensi_md.replace('\n', '<br/>')
+                    
+                    # Langkah 2: Ganti format bold (**teks**) dengan tag <b>teks</b>
+                    kompetensi_html = re.sub(r'\*\*(.*?)\*\*', r'\1', kompetensi_html)
+                    
+                    # Masukkan kembali teks yang sudah bersih ke dalam baris data
+                    row[0] = kompetensi_html
+            print("   -- Konversi HTML untuk kolom kompetensi selesai.")
+        # --- AKHIR BLOK YANG DIPERBARUI ---
+
+        if table_data:
+            try:
+                # Logika perhitungan rata-rata (tidak berubah)
+                average_scores = [float(row[3]) for row in table_data]
+                if average_scores:
+                    overall_average = sum(average_scores) / len(average_scores)
+                    
+                    if overall_average >= 75:
+                        overall_suitability_level = "Sangat Sesuai"
+                    elif overall_average >= 50:
+                        overall_suitability_level = "Sesuai dengan Catatan Pengembangan"
+                    else:
+                        overall_suitability_level = "Kurang Sesuai"
+                    print(f"   -- Rata-rata skor tabel: {overall_average:.2f}%. Level ditentukan sebagai: '{overall_suitability_level}'")
+                else:
+                    print("   -- Peringatan: Tidak ditemukan skor rata-rata yang valid di dalam data tabel.")
+            except (ValueError, IndexError) as e:
+                print(f"   -- Gagal menghitung rata-rata dari tabel: {e}. Level kesesuaian akan ditentukan oleh AI.")
+        else:
+            print("   -- Gagal membuat data tabel. Level kesesuaian akan ditentukan oleh AI.")
+
     # Inisialisasi variabel untuk menampung hasil AI
     executive_summary_formatted = "Konten Executive Summary gagal digenerate."
     person_fit_job_formatted = "Konten Person-Job Fit gagal digenerate."
@@ -1116,13 +1171,14 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     # --------------------------------------------------------------------------
     # B: GENERASI EXECUTIVE SUMMARY (PROSES 3 LANGKAH)
     # --------------------------------------------------------------------------
-    print("1. Memulai proses untuk Executive Summary Otomatis...")
+    print("2. Memulai proses untuk Executive Summary Otomatis...")
     executive_summary_formatted = generate_executive_summary(
         pekerjaan=pekerjaan,
         tipe_kepribadian=tipe_kepribadian,
         kognitif_utama=kognitif_utama_key,
         model_ai=model_ai,
-        bank_data_text=bank_data
+        bank_data_text=bank_data,
+        determined_level_from_table=overall_suitability_level # <-- Level dari tabel dimasukkan di sini
     )
     if "Error:" not in executive_summary_formatted:
         print("   -- Executive Summary otomatis berhasil dibuat.")
@@ -1132,7 +1188,7 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     # --------------------------------------------------------------------------
     # C: GENERASI PERSON-JOB FIT
     # --------------------------------------------------------------------------
-    print("2. Menggenerate konten Person-Job Fit...")
+    print("3. Menggenerate konten Person-Job Fit...")
     keywords_for_summary = [tipe_kepribadian, kognitif_utama_key]
     specific_context_es = extract_relevant_data(bank_data, keywords_for_summary)
     prompt_job_fit = PROMPT_TEMPLATES["person_job_fit_full"].format(
@@ -1167,11 +1223,7 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
 
     # --- BLOK KONDISIONAL UNTUK TABEL KECOCOKAN ---
     if pekerjaan and pekerjaan.strip():
-        print("3. Membuat tabel kecocokan pekerjaan...")
-        table_data = generate_suitability_analysis(
-            pekerjaan, tipe_kepribadian, kognitif_utama_key, model_ai, bank_data
-        )
-        if table_data:
+        if table_data: # Cek lagi jika tabel berhasil dibuat
             # Halaman 2: Tabel Kecocokan
             next_page_num = halaman_2_kecocokan(
                 c, table_data, page_num=next_page_num,
@@ -1200,16 +1252,16 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     c.save()
     print(f"\nPDF '{nama_file_output}' berhasil dibuat!")
 
-    return person_fit_job_formatted
+    return person_fit_job_formatted, overall_suitability_level
 
 # ==============================================================================
 # BAGIAN 6: EKSEKUSI SCRIPT (ENTRY POINT)
 # ==============================================================================
 if __name__ == "__main__":
     
-    config_tipe_kepribadian = "Openness"
+    config_tipe_kepribadian = "Conscientiousness"
     config_kognitif_utama = "WCST (Logika)" 
-    config_pekerjaan = "Tax Accountant"
+    config_pekerjaan = "Web Developer"
     config_model_ai = "llama3.1:8b"
     config_nama_file = "laporan_profiling_lengkap.pdf"
     

@@ -66,14 +66,14 @@ def process_analysis_task(
         os.makedirs(output_dir, exist_ok=True)
         nama_file_output_panjang = f"{output_dir}/{username}_long_report.pdf"
 
-        person_job_fit_text = generate_full_report(
+        person_job_fit_text, suitability_level_from_long_report = generate_full_report(
             tipe_kepribadian=tipe_kepribadian_tertinggi, kognitif_utama_key=kognitif_utama_key, pekerjaan=pekerjaan,
             model_ai="llama3.1:8b", nama_file_output=nama_file_output_panjang, biodata_kandidat=biodata_kandidat,
             topoplot_path_behaviour=topoplot_path_behavior, topoplot_path_cognitive=topoplot_path_cognitive
         )
         user.laporan_panjang = nama_file_output_panjang
         db.commit()
-        analysis_logger.info("CELERY WORKER: Laporan panjang selesai.")
+        analysis_logger.info(f"CELERY WORKER: Laporan panjang selesai. Level kesesuaian: '{suitability_level_from_long_report}'")
 
         # --- LANGKAH C: GENERATE LAPORAN PENDEK ---
         analysis_logger.info("CELERY WORKER: Memulai pembuatan laporan pendek...")
@@ -91,13 +91,12 @@ def process_analysis_task(
             topoplot_path_behaviour=topoplot_path_behavior, topoplot_path_cognitive=topoplot_path_cognitive,
             personality_title=personality_details.title, personality_desc=personality_details.description,
             cognitive_title=cognitive_details.title, cognitive_desc=cognitive_details.description,
-            person_job_fit_text_from_long_report=person_job_fit_text
+            person_job_fit_text_from_long_report=person_job_fit_text,
+            suitability_level=suitability_level_from_long_report  # <-- Parameter baru ditambahkan di sini
         )
         user.laporan_pendek = nama_file_output_pendek
         db.commit()
         analysis_logger.info("CELERY WORKER: Laporan pendek selesai.")
-        
-        analysis_logger.info(f"CELERY WORKER: SEMUA PROSES UNTUK USER {username} SELESAI.")
 
     except Exception as e:
         # 3. JIKA TERJADI ERROR DI BLOK TRY, TANGKAP DAN CATAT KE DATABASE

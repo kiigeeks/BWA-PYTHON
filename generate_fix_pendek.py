@@ -1,5 +1,4 @@
-# filename: generate_fix_pendek.py
-
+from typing import Optional
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
@@ -92,7 +91,7 @@ def extract_relevant_data(full_text, keywords):
 # ==============================================================================
 # === FUNGSI LOGIKA AI UTAMA ===
 # ==============================================================================
-def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, model_ai, bank_data_text):
+def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, model_ai, bank_data_text, suitability_level: Optional[str] = None):
     print("\nMemulai analisis AI (Metode Dynamic Master Analysis)...")
     specific_context = extract_relevant_data(bank_data_text, [tipe_kepribadian, kognitif_utama])
     if not specific_context: specific_context = "Tidak ada data konteks."
@@ -145,11 +144,21 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
         prompt_master = f"Anda adalah seorang analis psikologi.\nTUGAS: Tulis analisis mendalam (2-3 paragraf) tentang profil kandidat untuk posisi yang ditentukan. Fokus pada kekuatan, kelemahan, dan potensi pengembangan.\nPROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.\nPOSISI: {pekerjaan}.\nKONTEKS DATA:\n---\n{specific_context}\n---"
         master_analysis = generate_ai_content(prompt_master, model=model_ai, task_name="Langkah 1: Master Analysis (Pekerjaan)")
         
-        prompt_level = f'Berdasarkan teks analisis berikut, pilih SATU level kesesuaian.\nANALISIS: "{master_analysis}"\nPILIHAN: SANGAT SESUAI, SESUAI DENGAN CATATAN PENGEMBANGAN, KURANG SESUAI.\nJawaban Anda harus HANYA SATU dari tiga pilihan tersebut.'
-        determined_level_raw = generate_ai_content(prompt_level, model=model_ai, task_name="Langkah 2: Penentuan Level")
-        cleaned_level = determined_level_raw.strip().lstrip('-* ').rstrip('.,').upper().replace("SESUAI", "sesuai")
-        valid_levels, determined_level = ["SANGAT SESUAI", "KURANG SESUAI", "SESUAI DENGAN CATATAN PENGEMBANGAN"], "SESUAI DENGAN CATATAN PENGEMBANGAN"
-        if cleaned_level in valid_levels: determined_level = cleaned_level
+        determined_level = ""
+        # === PERUBAHAN INTI DIMULAI DI SINI ===
+        if suitability_level:
+            print(f"   -- Menggunakan level kesesuaian dari laporan panjang: '{suitability_level}'")
+            determined_level = suitability_level
+        else:
+            # Jalur fallback jika suitability_level tidak diberikan
+            print("   -- Menentukan level kesesuaian via AI (jalur fallback)...")
+            prompt_level = f'Berdasarkan teks analisis berikut, pilih SATU level kesesuaian.\nANALISIS: "{master_analysis}"\nPILIHAN: SANGAT SESUAI, SESUAI DENGAN CATATAN PENGEMBANGAN, KURANG SESUAI.\nJawaban Anda harus HANYA SATU dari tiga pilihan tersebut.'
+            determined_level_raw = generate_ai_content(prompt_level, model=model_ai, task_name="Langkah 2: Penentuan Level")
+            cleaned_level = determined_level_raw.strip().lstrip('-* ').rstrip('.,').upper().replace("SESUAI", "sesuai")
+            valid_levels = ["SANGAT SESUAI", "KURANG SESUAI", "SESUAI DENGAN CATATAN PENGEMBANGAN"]
+            determined_level = "SESUAI DENGAN CATATAN PENGEMBANGAN" # Default
+            if cleaned_level in valid_levels: determined_level = cleaned_level
+        # === PERUBAHAN INTI BERAKHIR DI SINI ===
 
         prompt_reasons = f'Berdasarkan teks analisis berikut, individu dinilai \'{determined_level}\' untuk pekerjaan tersebut.\nANALISIS: "{master_analysis}"\nTUGAS: Identifikasi 4 alasan utama berupa kekuatan atau sifat positif yang mendukung penilaian tersebut.\nINSTRUKSI:\n1. Tulis dalam format daftar singkat (4 poin).\n2. Setiap poin ringkas, maksimal 8 kata.\n3. Gunakan bahasa sederhana.\n4. Hindari jargon teknis.\n5. Jangan sertakan kalimat pembuka/penutup.'
         reasons_text = generate_ai_content(prompt_reasons, model=model_ai, task_name="Langkah 3: Ekstrak Alasan")
@@ -166,12 +175,12 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
         return {
             "suitability": determined_level,
             "position": pekerjaan,
-            "reasons_title": "Alasan :",
+            "reasons_title": "Pertimbangan :",
             "reasons": clean_ai_list(reasons_cleaned),
             "suggestions": [truncate_text(s, 12) for s in clean_ai_list(suggestions_cleaned)],
             "tips": tips_text.strip()
         }
-
+    
 def generate_job_fit_data(full_job_fit_html_text, model_ai):
     print("\nMemulai peringkasan AI untuk Rekomendasi Pekerjaan...")
     if not full_job_fit_html_text or "Error:" in full_job_fit_html_text:
@@ -445,7 +454,8 @@ def generate_short_report(
     personality_desc,
     cognitive_title,
     cognitive_desc,
-    person_job_fit_text_from_long_report: str
+    person_job_fit_text_from_long_report: str,
+    suitability_level: Optional[str] = None
 ):
     print("\n--- Memulai Pembuatan Laporan Pendek ---")
     try:
@@ -456,10 +466,15 @@ def generate_short_report(
         print("Error: file 'bank_data.txt' tidak ditemukan! Konteks AI akan kosong.")
         bank_data_content = ""
     
+    # === PERUBAHAN INTI DI SINI ===
+    # Meneruskan 'suitability_level' ke fungsi analisis
     ai_analysis_data = generate_short_report_analysis(
         tipe_kepribadian=tipe_kepribadian, kognitif_utama=kognitif_utama_key,
-        pekerjaan=pekerjaan, model_ai=model_ai, bank_data_text=bank_data_content
+        pekerjaan=pekerjaan, model_ai=model_ai, bank_data_text=bank_data_content,
+        suitability_level=suitability_level
     )
+    # === AKHIR PERUBAHAN ===
+    
     job_fit_data = generate_job_fit_data(
         full_job_fit_html_text=person_job_fit_text_from_long_report, model_ai=model_ai
     )
