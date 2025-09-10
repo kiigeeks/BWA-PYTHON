@@ -294,7 +294,6 @@ def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, mode
                     determined_level=determined_level, deep_analysis_and_score=deep_analysis_output)
                 final_narrative = generate_ai_content(prompt_step3, model=model_ai, task_name="ES - Penulisan Narasi")
     else:
-        # JIKA PEKERJAAN KOSONG: Lakukan proses untuk ringkasan umum (tidak berubah)
         print("   -> Pekerjaan tidak diisi. Menjalankan summary profil umum (2 langkah)...")
         
         prompt_analysis = PROMPT_TEMPLATES["prompt_general_analysis"].format(
