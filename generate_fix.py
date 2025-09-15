@@ -255,7 +255,9 @@ PROMPT_TEMPLATES = {
         """
 }
 
-def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text, determined_level_from_table=None):
+# file: generate_fix.py
+
+def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text, determined_level_from_table=None, average_score_from_table=None):
     """
     Menghasilkan executive summary secara dinamis.
     Jika 'pekerjaan' ada, buat analisis kesesuaian.
@@ -311,6 +313,25 @@ def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, mode
         else:
             final_narrative = general_analysis_output
 
+    if determined_level_from_table and average_score_from_table is not None:
+        try:
+            # Format persentase menjadi string seperti "(61%)"
+            percentage_str = f"({average_score_from_table:.0f}%)"
+
+            # Teks target yang akan diganti (dalam format Markdown)
+            target_text_md = f"**{determined_level_from_table}**"
+
+            # Teks pengganti yang baru (juga dalam format Markdown)
+            replacement_text_md = f"**{determined_level_from_table} {percentage_str}**"
+
+            # Lakukan penggantian pada teks narasi
+            # Menggunakan .replace() sederhana sudah cukup dan aman di sini
+            final_narrative = final_narrative.replace(target_text_md, replacement_text_md, 1)
+
+        except (ValueError, TypeError):
+            # Jika ada error saat format, lewati saja agar program tidak crash
+            pass
+        
     if "Error:" not in final_narrative:
         final_narrative = final_narrative.replace('**Executive Summary**', '').strip()                  
         return re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', final_narrative)
@@ -1112,6 +1133,7 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
 
     table_data = []
     overall_suitability_level = None # Variabel untuk menyimpan level hasil klasifikasi
+    overall_average = None
 
     print("\n--- Memulai Analisis Pra-Laporan ---")
     if pekerjaan and pekerjaan.strip():
@@ -1143,12 +1165,12 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
         if table_data:
             try:
                 # Logika perhitungan rata-rata (tidak berubah)
-                average_scores = [float(row[3]) for row in table_data]
+                average_scores = [float(row[3].replace('%', '')) for row in table_data]
                 if average_scores:
                     overall_average = sum(average_scores) / len(average_scores)
                     
                     if overall_average >= 75:
-                        overall_suitability_level = "Sangat Sesuai"
+                        overall_suitability_level = "Sangat Sesuai" 
                     elif overall_average >= 50:
                         overall_suitability_level = "Sesuai dengan Catatan Pengembangan"
                     else:
@@ -1177,7 +1199,8 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
         kognitif_utama=kognitif_utama_key,
         model_ai=model_ai,
         bank_data_text=bank_data,
-        determined_level_from_table=overall_suitability_level # <-- Level dari tabel dimasukkan di sini
+        determined_level_from_table=overall_suitability_level,
+        average_score_from_table=overall_average  # <-- TAMBAHKAN ARGUMEN INI
     )
     if "Error:" not in executive_summary_formatted:
         print("   -- Executive Summary otomatis berhasil dibuat.")
