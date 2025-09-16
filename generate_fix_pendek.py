@@ -4,7 +4,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import Color, black, white, HexColor
-from reportlab.platypus import Paragraph
+from reportlab.platypus import Paragraph, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.units import cm
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
 from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -91,7 +93,7 @@ def extract_relevant_data(full_text, keywords):
 # ==============================================================================
 # === FUNGSI LOGIKA AI UTAMA ===
 # ==============================================================================
-def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, model_ai, bank_data_text, suitability_level: Optional[str] = None):
+def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, model_ai, bank_data_text, suitability_level: Optional[str] = None, average_score: Optional[float] = None):
     print("\nMemulai analisis AI (Metode Dynamic Master Analysis)...")
     specific_context = extract_relevant_data(bank_data_text, [tipe_kepribadian, kognitif_utama])
     if not specific_context: specific_context = "Tidak ada data konteks."
@@ -172,8 +174,24 @@ def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, 
         suggestions_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in suggestions_text.split('\n') if line.strip()]
         
         print(f"Analisis AI untuk Pekerjaan '{pekerjaan}' selesai.")
+        reasons_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in reasons_text.split('\n') if line.strip()]
+        suggestions_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in suggestions_text.split('\n') if line.strip()]
+
+        print(f"Analisis AI untuk Pekerjaan '{pekerjaan}' selesai.")
+
+        # --- BLOK BARU UNTUK MENAMBAHKAN PERSENTASE ---
+        final_suitability_text = determined_level
+        if determined_level and average_score is not None:
+            try:
+                percentage_str = f"({average_score:.0f}%)"
+                final_suitability_text = f"{determined_level} {percentage_str}"
+            except (ValueError, TypeError):
+                # Jika format gagal, gunakan teks asli
+                pass
+        # --- AKHIR BLOK BARU ---
+
         return {
-            "suitability": determined_level,
+            "suitability": final_suitability_text, # <-- Gunakan variabel yang sudah dimodifikasi
             "position": pekerjaan,
             "reasons_title": "Pertimbangan :",
             "reasons": clean_ai_list(reasons_cleaned),
@@ -195,7 +213,7 @@ def generate_job_fit_data(full_job_fit_html_text, model_ai):
             parts = line.split(':', 1)
             title, reason = parts[0].strip().lstrip('*- '), parts[1].strip()
             if title and reason: recommendations.append({"title": title, "reason": reason})
-    while len(recommendations) < 6: recommendations.append({"title": "Data Tidak Tersedia", "reason": "AI tidak memberikan data yang cukup."})
+    # while len(recommendations) < 6: recommendations.append({"title": "Data Tidak Tersedia", "reason": "AI tidak memberikan data yang cukup."})
     print("Peringkasan Rekomendasi Pekerjaan selesai.")
     return recommendations[:6]
 
@@ -383,10 +401,13 @@ def halaman_3_job_fit(c, job_data, page_num):
     draw_header(c)
     c.setFont("Times-Bold", 14)
     c.drawCentredString(PAGE_WIDTH / 2, PAGE_HEIGHT - 150, "PERSON TO FIT BIDANG KERJA/USAHA")
+
+    valid_job_data = [job for job in job_data if "Data Tidak Tersedia" not in job.get("title", "")]
+
     box_width, h_gap, v_gap = 88 * mm, 10 * mm, 10 * mm
     x_start, y_start = (PAGE_WIDTH - (2*box_width + h_gap))/2, PAGE_HEIGHT - 170
     box_data = []
-    for job in job_data:
+    for job in valid_job_data: 
         wrapped = wrap_text_to_width(job['reason'], "Times-Roman", 11, (box_width - 15)/mm)
         content_height = 20 + (len(wrapped) * 12) + 12
         box_data.append({"job": job, "wrapped": wrapped, "height": max(45*mm, content_height)})
@@ -438,6 +459,57 @@ def halaman_4_disclaimer(c, disclaimer_text, page_num):
     draw_footer(c, page_num)
     c.showPage()
     
+def halaman_tabel_kecocokan(c, table_data, page_num, personality_name, cognitive_name, job_name):
+    draw_watermark(c, "cia_watermark.png")
+    draw_header(c)
+
+    y_start = PAGE_HEIGHT - 140
+    c.setFont("Times-Bold", 12)
+    c.drawString(60, y_start, f"ANALISIS KECOCOKAN UNTUK: {job_name.upper()}")
+
+    cell_style = ParagraphStyle(
+        "TableCell",
+        fontSize=9,
+        leading=11,
+        wordWrap="CJK"
+    )
+
+    headers = [
+        Paragraph("Kompetensi Utama", cell_style),
+        Paragraph(f"{personality_name} (%)", cell_style),
+        Paragraph(f"{cognitive_name} (%)", cell_style),
+        Paragraph("Rata-rata Kesesuaian (%)", cell_style),
+        Paragraph("Interpretasi", cell_style),
+    ]
+
+    data_for_table = [headers]
+    for row in table_data:
+        wrapped_row = [Paragraph(str(cell), cell_style) for cell in row]
+        data_for_table.append(wrapped_row)
+
+    col_widths = [5*cm, 3*cm, 3*cm, 3*cm, 3*cm]
+
+    table = Table(data_for_table, colWidths=col_widths)
+
+    table_style = TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightblue),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('ALIGN', (1,1), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('FONTNAME', (0,0), (-1,0), 'Times-Bold'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
+    ])
+
+    table.setStyle(table_style)
+
+    w, h = table.wrapOn(c, PAGE_WIDTH - 120, y_start)
+    table.drawOn(c, 60, y_start - h - 10)
+
+    draw_footer(c, page_num)
+    c.showPage()
+    return page_num + 1
+
 # =======================================================
 # === FUNGSI UTAMA GENERATE LAPORAN ===
 # =======================================================
@@ -455,7 +527,9 @@ def generate_short_report(
     cognitive_title,
     cognitive_desc,
     person_job_fit_text_from_long_report: str,
-    suitability_level: Optional[str] = None
+    suitability_level: Optional[str] = None,
+    suitability_table_data: Optional[list] = None,
+    average_score: Optional[float] = None
 ):
     print("\n--- Memulai Pembuatan Laporan Pendek ---")
     try:
@@ -471,7 +545,7 @@ def generate_short_report(
     ai_analysis_data = generate_short_report_analysis(
         tipe_kepribadian=tipe_kepribadian, kognitif_utama=kognitif_utama_key,
         pekerjaan=pekerjaan, model_ai=model_ai, bank_data_text=bank_data_content,
-        suitability_level=suitability_level
+        suitability_level=suitability_level, average_score=average_score
     )
     # === AKHIR PERUBAHAN ===
     
@@ -490,9 +564,30 @@ def generate_short_report(
     disclaimer_text = 'Profiling ini <b>bukan merupakan tes psikologi</b> melainkan <b>deskripsi profile respon elektrofisiologis sistem syaraf terhadap stimulus behavioral traits dan cognitive traits</b> yang dihitung melalui brain power EEG Emotive system yaitu skor EEG brain power enggagement, excitemen dan interest. Profiling ini menggunakan sumber bukti validitas dari penelitian sebelumnya. EEG dapat digunakan secara efektif untuk memprediksi kepribadian dengan akurasi yang tinggi. Zhu et al. (2002) melaporkan prediksi EEG trait agreeableness dengan akurasi hingga 86%. <u><font color="#3366cc">Zhu et al., 2020</font></u>. <u><font color="#3366cc">Liu et al., 2022</font></u> menunjukkan bahwa model berbasis EEG dapat mencapai akurasi 92.2% dalam memprediksi trait openness <u><font color="#3366cc">Liu et al., 2022</font></u>. <u><font color="#3366cc">Rana et al., 2021</font></u> menemukan bahwa analisis emosi dari sinyal EEG memprediksi extraversion dengan akurasi 81.08% dan agreeableness dengan 86.11% <u><font color="#3366cc">Rana et al., 2021</font></u>.'
 
     c = canvas.Canvas(nama_file_output, pagesize=A4)
-    halaman_1_cover(c, biodata_kandidat, topoplot_path_behaviour, topoplot_path_cognitive, tipe_kepribadian, kognitif_utama_key, page_num=1)
-    halaman_2_traits(c, personality_data_for_pdf, page_num=2)
-    halaman_3_job_fit(c, job_fit_data, page_num=3)
-    halaman_4_disclaimer(c, disclaimer_text, page_num=4)
+    next_page_num = 1 # Inisialisasi nomor halaman
+
+    halaman_1_cover(c, biodata_kandidat, topoplot_path_behaviour, topoplot_path_cognitive, tipe_kepribadian, kognitif_utama_key, page_num=next_page_num)
+    next_page_num += 1
+
+    # --- BLOK KONDISIONAL BARU UNTUK TABEL ---
+    if pekerjaan and pekerjaan.strip() and suitability_table_data:
+        print("   -- Menambahkan halaman tabel kecocokan ke laporan pendek...")
+        next_page_num = halaman_tabel_kecocokan(
+            c, suitability_table_data, page_num=next_page_num,
+            personality_name=tipe_kepribadian,
+            cognitive_name=kognitif_utama_key,
+            job_name=pekerjaan
+        )
+    # --- AKHIR BLOK KONDISIONAL ---
+
+    halaman_2_traits(c, personality_data_for_pdf, page_num=next_page_num)
+    next_page_num += 1
+
+    halaman_3_job_fit(c, job_fit_data, page_num=next_page_num)
+    next_page_num += 1
+
+    halaman_4_disclaimer(c, disclaimer_text, page_num=next_page_num)
+    next_page_num += 1
+
     c.save()
     print(f"PDF Laporan Pendek '{nama_file_output}' berhasil dibuat!")

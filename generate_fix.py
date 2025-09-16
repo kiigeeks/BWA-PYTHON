@@ -1274,7 +1274,8 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     c.save()
     print(f"\nPDF '{nama_file_output}' berhasil dibuat!")
 
-    return person_fit_job_formatted, overall_suitability_level
+    return person_fit_job_formatted, overall_suitability_level, table_data, overall_average
+
 
 # ==============================================================================
 # BAGIAN 6: EKSEKUSI SCRIPT (ENTRY POINT)
