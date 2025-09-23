@@ -29,24 +29,6 @@ from generate_fix_pendek import generate_short_report
 
 models.Base.metadata.create_all(bind=engine)
 
-# <-- Perubahan 2: Setup logger untuk otentikasi (sudah ada) -->
-# auth_logger = logging.getLogger('auth_logger')
-# auth_logger.setLevel(logging.INFO)
-# auth_file_handler = logging.FileHandler('auth.log', mode='a')
-# auth_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-# auth_file_handler.setFormatter(auth_formatter)
-# if not auth_logger.handlers:
-#     auth_logger.addHandler(auth_file_handler)
-
-# <-- Perubahan 3: Setup logger baru KHUSUS untuk proses analisis -->
-# analysis_logger = logging.getLogger('analysis_logger')
-# analysis_logger.setLevel(logging.INFO)
-# analysis_file_handler = logging.FileHandler('analysis.log', mode='a') # Akan membuat file analysis.log
-# analysis_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# analysis_file_handler.setFormatter(analysis_formatter)
-# if not analysis_logger.handlers:
-#     analysis_logger.addHandler(analysis_file_handler)
-
 analysis_logger = setup_logger('analysis_logger', 'analysis.log')
 auth_logger = setup_logger('auth_logger', 'auth.log') # <- Kita juga bisa pakai ini untuk auth_logger!
 
@@ -298,9 +280,7 @@ async def change_user_password(
 async def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = db.query(models.User).options(
         joinedload(models.User.personalities_data), 
-        # joinedload(models.User.personality_accuracies), 
         joinedload(models.User.cognitive_data), 
-        # joinedload(models.User.split_brain_data), 
         joinedload(models.User.response_data),
         joinedload(models.User.roc_curves)
     ).filter(models.User.id == user_id).first()
