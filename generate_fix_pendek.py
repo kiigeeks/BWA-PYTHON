@@ -165,12 +165,15 @@ def wrap_text_to_width(text, font_name, font_size, max_width_mm):
 
 def halaman_1_baru(c, biodata, table_data, ai_data, personality_name, cognitive_name, job_name, page_num):
     draw_watermark(c, "cia_watermark.png"); draw_header(c)
+    
+    # Mengatur ulang posisi awal sedikit lebih tinggi untuk menghemat ruang
     c.setFont("Times-Bold", 18); c.setFillColorRGB(0, 0.2, 0.6); c.drawCentredString(PAGE_WIDTH / 2, PAGE_HEIGHT - 145, "BRAIN WAVE PROFILING")
     c.setFillColor(black); c.setFont("Times-Roman", 12); y = PAGE_HEIGHT - 160
     for label, value in biodata.items():
         c.drawString(60, y, f"{label}"); c.drawString(180, y, f": {value}"); y -= 16
     
     if table_data:
+        # Mengurangi spasi sebelum dan sesudah tabel
         y -= 15; c.setFont("Times-Bold", 12); c.drawString(60, y, f"ANALISIS KECOCOKAN UNTUK: {job_name.upper()}"); y -= 10
         cell_style = ParagraphStyle("TableCell", fontSize=9, leading=11, wordWrap="CJK")
         headers = [Paragraph("Kompetensi Utama", cell_style), Paragraph(f"{personality_name} (%)", cell_style), Paragraph(f"{cognitive_name} (%)", cell_style), Paragraph("Rata-rata (%)", cell_style), Paragraph("Interpretasi", cell_style)]
@@ -181,7 +184,8 @@ def halaman_1_baru(c, biodata, table_data, ai_data, personality_name, cognitive_
 
     style_alasan = ParagraphStyle(name='alasan', fontName='Times-Roman', fontSize=10, leading=14)
     total_reasons_height = sum(Paragraph(f"{i+1}. {markdown_to_html_platypus(reason_md)}", style_alasan).wrapOn(c, 150*mm, 20*mm)[1] + 4 for i, reason_md in enumerate(ai_data.get('reasons', [])))
-    suitability_height = total_reasons_height + 35*mm
+    # Mengurangi padding vertikal di dalam kotak Pertimbangan
+    suitability_height = total_reasons_height + 35*mm 
     
     if y - suitability_height < FOOTER_MARGIN:
         draw_footer(c, page_num); c.showPage(); page_num += 1
@@ -200,9 +204,6 @@ def halaman_1_baru(c, biodata, table_data, ai_data, personality_name, cognitive_
     draw_footer(c, page_num); c.showPage()
     return page_num + 1
 
-# ==============================================================================
-# === FUNGSI HALAMAN 2 YANG DIDESAIN ULANG SESUAI PERMINTAAN TERAKHIR ===
-# ==============================================================================
 def halaman_2_baru(c, topoplot_behavior, topoplot_cognitive, tipe_kepribadian, kognitif_nama, biodata, data_traits, page_num):
     draw_watermark(c, "cia_watermark.png"); draw_header(c)
 

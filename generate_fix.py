@@ -898,20 +898,9 @@ def halaman_disclaimer(c, disclaimer_text, page_num):
 def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_ai, nama_file_output, biodata_kandidat, topoplot_path_behaviour, topoplot_path_cognitive):
     """
     Fungsi utama untuk menggenerate laporan profiling lengkap dari awal hingga akhir.
-    
-    Args:
-        tipe_kepribadian (str): Nama trait kepribadian utama (e.g., "Openness").
-        kognitif_utama_key (str): Kunci untuk trait kognitif utama (e.g., "WCST (Logika)").
-        pekerjaan (str): Nama pekerjaan yang dilamar (e.g., "Tax Accountant").
-        model_ai (str): Nama model Ollama yang akan digunakan (e.g., "llama3.1:8b").
-        nama_file_output (str): Path untuk menyimpan file PDF hasil.
-        biodata_kandidat (dict): Dictionary berisi biodata kandidat.
     """
     print("Memulai proses pembuatan laporan...")
 
-    # --------------------------------------------------------------------------
-    # A: MEMUAT DATA REFERENSI DAN KONTEN STATIS
-    # --------------------------------------------------------------------------
     try:
         with open("bank_data.txt", "r", encoding="utf-8") as f:
             bank_data = f.read()
@@ -920,13 +909,11 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
         print("Error: file 'bank_data.txt' tidak ditemukan! Proses dihentikan.")
         return
 
-    # Muat konten statis berdasarkan input fungsi
     behavior_traits_text = BEHAVIOR_TRAITS_BANK.get(tipe_kepribadian, "Teks untuk kepribadian ini belum tersedia.")
     cognitive_traits_text = COGNITIVE_TRAITS_BANK.get(kognitif_utama_key, "Teks untuk kognitif ini belum tersedia.")
     kognitif_utama_display_name = kognitif_utama_key
     
-    # Konten statis lainnya
-    nama_kandidat = biodata_kandidat.get('Nama', 'Kandidat') # Mengambil nama dari biodata
+    nama_kandidat = biodata_kandidat.get('Nama', 'Kandidat')
     judul_topoplot1 = f"<b>Gambar 1. Topografi respons {nama_kandidat} terhadap stimulus behavioral trait {tipe_kepribadian.lower()}</b>"
     nama_kognitif_inti = kognitif_utama_key.split('(')[0].strip()
     judul_topoplot2 = f"<b>Gambar 2. Brain topografi Brain Wave Analysis Power stimulus {nama_kognitif_inti.lower()}</b>"
@@ -1132,7 +1119,7 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
     )
 
     table_data = []
-    overall_suitability_level = None # Variabel untuk menyimpan level hasil klasifikasi
+    overall_suitability_level = None
     overall_average = None
 
     print("\n--- Memulai Analisis Pra-Laporan ---")
@@ -1142,33 +1129,29 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
             pekerjaan, tipe_kepribadian, kognitif_utama_key, model_ai, bank_data
         )
 
-        # --- BLOK YANG DIPERBARUI: KONVERSI MARKDOWN KE HTML UNTUK TABEL ---
+        # === PERBAIKAN 2: Membersihkan tabel dari karakter '*' ===
         if table_data:
-            print("   -- Mengonversi format markdown (bold & newline) di kolom 'Kompetensi Utama' ke HTML...")
+            cleaned_table_data = []
             for row in table_data:
-                # Cek untuk memastikan baris tidak kosong
-                if len(row) > 0:
-                    # Ambil teks asli dari kolom kompetensi
-                    kompetensi_md = row[0]
-                    
-                    # Langkah 1: Ganti newline (\n) dengan tag <br/>
-                    kompetensi_html = kompetensi_md.replace('\n', '<br/>')
-                    
-                    # Langkah 2: Ganti format bold (**teks**) dengan tag <b>teks</b>
-                    kompetensi_html = re.sub(r'\*\*(.*?)\*\*', r'\1', kompetensi_html)
-                    
-                    # Masukkan kembali teks yang sudah bersih ke dalam baris data
-                    row[0] = kompetensi_html
-            print("   -- Konversi HTML untuk kolom kompetensi selesai.")
-        # --- AKHIR BLOK YANG DIPERBARUI ---
+                # Membersihkan setiap sel dalam baris dari asterisk dan spasi ekstra
+                cleaned_row = [cell.replace('*', '').strip() for cell in row]
+                cleaned_table_data.append(cleaned_row)
+            table_data = cleaned_table_data
 
-        if table_data:
+            # === PERBAIKAN 1: Logika perhitungan rata-rata yang lebih kuat ===
             try:
-                # Logika perhitungan rata-rata (tidak berubah)
-                average_scores = [float(row[3].replace('%', '')) for row in table_data]
+                average_scores = []
+                for row in table_data:
+                    if len(row) > 3:
+                        # Membersihkan string: hapus %, ganti koma dgn titik, hapus spasi
+                        score_str = row[3].replace('%', '').replace(',', '.').strip()
+                        try:
+                            average_scores.append(float(score_str))
+                        except (ValueError, TypeError):
+                            print(f"Peringatan: Tidak dapat mengonversi '{row[3]}' menjadi float. Melewati baris ini.")
+                
                 if average_scores:
                     overall_average = sum(average_scores) / len(average_scores)
-                    
                     if overall_average >= 75:
                         overall_suitability_level = "Sangat Sesuai" 
                     elif overall_average >= 50:
@@ -1178,104 +1161,53 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
                     print(f"   -- Rata-rata skor tabel: {overall_average:.2f}%. Level ditentukan sebagai: '{overall_suitability_level}'")
                 else:
                     print("   -- Peringatan: Tidak ditemukan skor rata-rata yang valid di dalam data tabel.")
-            except (ValueError, IndexError) as e:
+            except Exception as e:
                 print(f"   -- Gagal menghitung rata-rata dari tabel: {e}. Level kesesuaian akan ditentukan oleh AI.")
         else:
             print("   -- Gagal membuat data tabel. Level kesesuaian akan ditentukan oleh AI.")
 
-    # Inisialisasi variabel untuk menampung hasil AI
     executive_summary_formatted = "Konten Executive Summary gagal digenerate."
     person_fit_job_formatted = "Konten Person-Job Fit gagal digenerate."
     
     print("\n--- Memulai Generasi Konten AI ---")
-
-    # --------------------------------------------------------------------------
-    # B: GENERASI EXECUTIVE SUMMARY (PROSES 3 LANGKAH)
-    # --------------------------------------------------------------------------
-    print("2. Memulai proses untuk Executive Summary Otomatis...")
-    executive_summary_formatted = generate_executive_summary(
-        pekerjaan=pekerjaan,
-        tipe_kepribadian=tipe_kepribadian,
-        kognitif_utama=kognitif_utama_key,
-        model_ai=model_ai,
-        bank_data_text=bank_data,
-        determined_level_from_table=overall_suitability_level,
-        average_score_from_table=overall_average  # <-- TAMBAHKAN ARGUMEN INI
-    )
-    if "Error:" not in executive_summary_formatted:
-        print("   -- Executive Summary otomatis berhasil dibuat.")
-    else:
-        print(f"   -- Gagal membuat Executive Summary. Respon: {executive_summary_formatted}")
     
-    # --------------------------------------------------------------------------
-    # C: GENERASI PERSON-JOB FIT
-    # --------------------------------------------------------------------------
+    executive_summary_formatted = generate_executive_summary(
+        pekerjaan=pekerjaan, tipe_kepribadian=tipe_kepribadian, kognitif_utama=kognitif_utama_key,
+        model_ai=model_ai, bank_data_text=bank_data,
+        determined_level_from_table=overall_suitability_level, average_score_from_table=overall_average
+    )
+    
     print("3. Menggenerate konten Person-Job Fit...")
     keywords_for_summary = [tipe_kepribadian, kognitif_utama_key]
     specific_context_es = extract_relevant_data(bank_data, keywords_for_summary)
-    prompt_job_fit = PROMPT_TEMPLATES["person_job_fit_full"].format(
-        tipe_kepribadian=tipe_kepribadian,
-        kognitif_utama=kognitif_utama_display_name,
-        specific_context=specific_context_es
-    )
+    prompt_job_fit = PROMPT_TEMPLATES["person_job_fit_full"].format(tipe_kepribadian=tipe_kepribadian, kognitif_utama=kognitif_utama_display_name, specific_context=specific_context_es)
     raw_markdown_text = generate_ai_content(prompt_job_fit, model=model_ai, task_name="Person-Job Fit (Markdown)")
 
     if "Error:" not in raw_markdown_text:
-        print("   -- Mengonversi format Markdown ke HTML untuk PDF...")
         html_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', raw_markdown_text)
         person_fit_job_formatted = html_text.replace('\n', '<br/>')
-        print("   -- Format HTML untuk Person-Job Fit berhasil dibuat.")
     else:
         person_fit_job_formatted = raw_markdown_text
-        print(f"   -- Gagal meng-generate konten Person-Job Fit. Respon: {person_fit_job_formatted}")
 
-
-    # --------------------------------------------------------------------------
-    # D: PEMBUATAN PDF
-    # --------------------------------------------------------------------------
     print(f"\n--- Memulai Pembuatan PDF: {nama_file_output} ---")
     c = canvas.Canvas(nama_file_output, pagesize=A4)
-    
-    # Inisialisasi nomor halaman
     next_page_num = 1
-    
-    # Halaman 1: Cover & Executive Summary
     halaman_1_cover(c, biodata_kandidat, executive_summary_formatted, page_num=next_page_num)
     next_page_num += 1
 
-    # --- BLOK KONDISIONAL UNTUK TABEL KECOCOKAN ---
-    if pekerjaan and pekerjaan.strip():
-        if table_data: # Cek lagi jika tabel berhasil dibuat
-            # Halaman 2: Tabel Kecocokan
-            next_page_num = halaman_2_kecocokan(
-                c, table_data, page_num=next_page_num,
-                personality_name=tipe_kepribadian,
-                cognitive_name=kognitif_utama_display_name,
-                job_name=pekerjaan
-            )
-        else:
-            print("   -- Gagal membuat data untuk tabel kecocokan, halaman akan dilewati.")
+    if pekerjaan and pekerjaan.strip() and table_data:
+        next_page_num = halaman_2_kecocokan(c, table_data, page_num=next_page_num, personality_name=tipe_kepribadian, cognitive_name=kognitif_utama_display_name, job_name=pekerjaan)
             
-    # Halaman Berikutnya: Behavior Traits
     next_page_num = halaman_3_behavior(c, behavior_traits_text, topoplot_path_behaviour, judul_topoplot1, page_num=next_page_num)
-    
-    # Halaman Berikutnya: Cognitive Traits
     next_page_num = halaman_cognitive(c, cognitive_traits_text, topoplot_path_cognitive, judul_topoplot2, page_num=next_page_num)
-
-    # Halaman Berikutnya: Person-Job Fit
     next_page_num = halaman_person_fit_job(c, person_fit_job_formatted, page_num=next_page_num)
-    
-    # Halaman Berikutnya: Referensi
     next_page_num = halaman_referensi(c, referensi_text_1, page_num=next_page_num)
-    
-    # Halaman Terakhir: Disclaimer
     next_page_num = halaman_disclaimer(c, disclaimer_text, page_num=next_page_num)
 
     c.save()
     print(f"\nPDF '{nama_file_output}' berhasil dibuat!")
 
     return person_fit_job_formatted, overall_suitability_level, table_data, overall_average
-
 
 # ==============================================================================
 # BAGIAN 6: EKSEKUSI SCRIPT (ENTRY POINT)
