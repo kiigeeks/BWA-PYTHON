@@ -27,6 +27,8 @@ from config import settings
 from generate_fix import generate_full_report
 from generate_fix_pendek import generate_short_report
 
+from transformers import pipeline
+
 models.Base.metadata.create_all(bind=engine)
 
 analysis_logger = setup_logger('analysis_logger', 'analysis.log')
@@ -51,6 +53,18 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+print("Memuat model analisis sentimen, harap tunggu...")
+try:
+    sentiment_analyzer = pipeline(
+        "sentiment-analysis",
+        model="Aardiiiiy/indobertweet-base-Indonesian-sentiment-analysis",
+        framework="pt"
+    )
+    print("Model analisis sentimen siap digunakan.")
+except Exception as e:
+    sentiment_analyzer = None
+    print(f"GAGAL MEMUAT MODEL SENTIMEN: {e}")
 
 @app.get("/", tags=["Status"])
 async def read_root():
@@ -332,3 +346,59 @@ async def read_users(
         message=f"Berhasil mengambil data {len(users_to_return)} user.",
         payload=payload_data
     )
+
+@app.post(
+    "/v1/sentiment-analysis", 
+    summary="Menganalisis sentimen dari sebuah kalimat", 
+    response_model=StandardResponse[schemas.SentimentResponse], 
+    tags=["Sentiment Analysis"]
+)
+async def analyze_sentiment(
+    # 2. Parameter diubah dari Pydantic Model menjadi Form Data
+    kalimat: str = Form(..., description="Kalimat yang akan dianalisis sentimennya.")
+):
+    """
+    Menganalisis sebuah kalimat berbahasa Indonesia dan mengembalikan sentimennya.
+    - **0**: Positif
+    - **1**: Netral
+    - **2**: Negatif
+    """
+    if sentiment_analyzer is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model analisis sentimen tidak berhasil dimuat. Fitur ini tidak tersedia."
+        )
+    
+    # 3. Sekarang kita bisa langsung menggunakan variabel 'kalimat'
+    #    (Tidak perlu lagi `request.kalimat`)
+    
+    label_to_int = {
+        'positive': 0,
+        'neutral': 1,
+        'negative': 2
+    }
+    
+    try:
+        hasil_prediksi = sentiment_analyzer(kalimat)
+        label_string = hasil_prediksi[0]['label']
+        sentimen_int = label_to_int.get(label_string.lower(), -1)
+
+        if sentimen_int == -1:
+             raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Model mengembalikan label yang tidak dikenal: {label_string}"
+            )
+
+        payload = schemas.SentimentResponse(
+            kalimat=kalimat,
+            hasil_sentimen=sentimen_int,
+            label=label_string
+        )
+
+        return StandardResponse(message="Analisis sentimen berhasil", payload=payload)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Terjadi kesalahan saat melakukan analisis sentimen: {str(e)}"
+        )

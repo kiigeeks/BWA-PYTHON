@@ -130,3 +130,11 @@ class UserListPayload(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str
     new_password: str
+
+class SentimentRequest(BaseModel):
+    kalimat: str = Field(..., description="Kalimat yang akan dianalisis sentimennya.")
+
+class SentimentResponse(BaseModel):
+    kalimat: str
+    hasil_sentimen: int = Field(..., description="Hasil sentimen (0: Negatif, 1: Netral, 2: Positif)")
+    label: str
