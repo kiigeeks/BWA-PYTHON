@@ -29,6 +29,10 @@ from generate_fix_pendek import generate_short_report
 
 from transformers import pipeline
 
+from sentence_transformers import SentenceTransformer
+from bertopic import BERTopic
+import pandas as pd 
+
 models.Base.metadata.create_all(bind=engine)
 
 analysis_logger = setup_logger('analysis_logger', 'analysis.log')
@@ -65,6 +69,14 @@ try:
 except Exception as e:
     sentiment_analyzer = None
     print(f"GAGAL MEMUAT MODEL SENTIMEN: {e}")
+
+print("Memuat model embedding untuk clustering, harap tunggu...")
+try:
+    embedding_model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+    print("Model embedding untuk clustering siap digunakan.")
+except Exception as e:
+    embedding_model = None
+    print(f"GAGAL MEMUAT MODEL EMBEDDING: {e}")
 
 @app.get("/", tags=["Status"])
 async def read_root():
@@ -401,4 +413,75 @@ async def analyze_sentiment(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Terjadi kesalahan saat melakukan analisis sentimen: {str(e)}"
+        )
+
+@app.post(
+    "/v1/clustering",
+    summary="Mengelompokkan list komentar ke dalam topik-topik relevan",
+    response_model=StandardResponse[schemas.ClusteringResponse],
+    tags=["Clustering"]
+)
+async def cluster_comments(
+    request: schemas.ClusteringRequest
+):
+    """
+    Menerima list komentar dan melakukan topic modeling untuk menemukan cluster.
+    - **Input**: List berisi string komentar.
+    - **Output**: JSON berisi cluster yang ditemukan, lengkap dengan kata kunci dan contoh komentar utamanya.
+    """
+    if embedding_model is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model embedding untuk clustering tidak berhasil dimuat."
+        )
+
+    komentar = request.komentar
+    
+    try:
+        # Langkah 1: Inisialisasi BERTopic.
+        # min_topic_size bisa disesuaikan. Angka kecil akan menghasilkan lebih banyak topik spesifik.
+        topic_model = BERTopic(min_topic_size=3, verbose=False)
+
+        # Langkah 2: Buat embeddings dari list komentar. Ini adalah proses yang intensif.
+        print(f"Membuat embeddings untuk {len(komentar)} komentar...")
+        embeddings = embedding_model.encode(komentar, show_progress_bar=False)
+
+        # Langkah 3: Lakukan clustering dengan BERTopic
+        print("Memulai proses clustering...")
+        topics, probabilities = topic_model.fit_transform(komentar, embeddings)
+        
+        # Langkah 4: Proses hasil untuk dijadikan output JSON
+        topic_info_df = topic_model.get_topic_info()
+        hasil_list = []
+
+        for index, row in topic_info_df.iterrows():
+            topic_id = row['Topic']
+            # Kita abaikan cluster -1 karena itu adalah outlier (komentar yang tidak masuk ke grup manapun)
+            if topic_id == -1:
+                continue
+            
+            # Ambil 5 kata kunci teratas untuk setiap topik
+            keywords = [word for word, score in topic_model.get_topic(topic_id)[:5]]
+            
+            # Buat objek Pydantic untuk setiap topik
+            topic_data = schemas.TopicResult(
+                cluster_id=topic_id,
+                jumlah_komentar=row['Count'],
+                kata_kunci=keywords,
+                komentar_utama=row['Representative_Docs']
+            )
+            hasil_list.append(topic_data)
+
+        # Siapkan payload akhir
+        payload = schemas.ClusteringResponse(
+            total_topik_ditemukan=len(hasil_list),
+            hasil_clustering=hasil_list
+        )
+
+        return StandardResponse(message="Clustering komentar berhasil", payload=payload)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Terjadi kesalahan saat proses clustering: {str(e)}"
         )

@@ -138,3 +138,16 @@ class SentimentResponse(BaseModel):
     kalimat: str
     hasil_sentimen: int = Field(..., description="Hasil sentimen (0: Negatif, 1: Netral, 2: Positif)")
     label: str
+
+class ClusteringRequest(BaseModel):
+    komentar: List[str] = Field(..., min_length=5, description="List komentar yang akan di-cluster. Minimal harus ada 5 komentar.")
+
+class TopicResult(BaseModel):
+    cluster_id: int
+    jumlah_komentar: int
+    kata_kunci: List[str]
+    komentar_utama: List[str] = Field(..., description="Komentar yang paling mewakili cluster (centroid).")
+
+class ClusteringResponse(BaseModel):
+    total_topik_ditemukan: int
+    hasil_clustering: List[TopicResult]
