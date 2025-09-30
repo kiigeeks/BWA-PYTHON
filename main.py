@@ -16,6 +16,11 @@ from tasks import process_analysis_task
 from logger_config import setup_logger
 from datetime import date
 
+from sentence_transformers import util
+import spacy
+import spacy.cli
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 from tools import process_edf_to_final_csv, convert_edf_to_single_csv, process_edf_with_ica_to_csv
 from auth import get_current_user, get_password_hash, create_access_token, get_user, verify_password 
 from logic import run_full_analysis
@@ -36,7 +41,7 @@ import pandas as pd
 models.Base.metadata.create_all(bind=engine)
 
 analysis_logger = setup_logger('analysis_logger', 'analysis.log')
-auth_logger = setup_logger('auth_logger', 'auth.log') # <- Kita juga bisa pakai ini untuk auth_logger!
+auth_logger = setup_logger('auth_logger', 'auth.log')
 
 app = FastAPI(
     title="Brainwave Analysis API",
@@ -77,6 +82,35 @@ try:
 except Exception as e:
     embedding_model = None
     print(f"GAGAL MEMUAT MODEL EMBEDDING: {e}")
+
+print("Memuat model untuk Semantic Similarity, harap tunggu...")
+try:
+    # Model ini sama dengan yang ada di clustering, jadi kita bisa pakai ulang
+    if 'embedding_model' not in globals():
+        embedding_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+    
+    try:
+        # 1. Coba muat model seperti biasa
+        nlp_ner = spacy.load("xx_ent_wiki_sm")
+        print("Model spaCy 'xx_ent_wiki_sm' berhasil dimuat.")
+    except OSError:
+        # 2. Jika gagal (tidak ditemukan), unduh secara otomatis
+        print("Model spaCy 'xx_ent_wiki_sm' tidak ditemukan. Mengunduh secara otomatis...")
+        spacy.cli.download("xx_ent_wiki_sm")
+        # 3. Coba muat lagi setelah diunduh
+        nlp_ner = spacy.load("xx_ent_wiki_sm")
+        print("Model spaCy berhasil diunduh dan dimuat.")
+
+    # Model NLI (Natural Language Inference)
+    nli_pipeline = pipeline("text-classification", model="MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli", truncation=True)
+    
+    print("Semua model untuk Semantic Similarity siap digunakan.")
+
+except Exception as e:
+    embedding_model = None
+    nlp_ner = None
+    nli_pipeline = None
+    print(f"GAGAL MEMUAT MODEL UNTUK SEMANTIC SIMILARITY: {e}")
 
 @app.get("/", tags=["Status"])
 async def read_root():
@@ -446,24 +480,19 @@ async def cluster_comments(
         print(f"Membuat embeddings untuk {len(komentar)} komentar...")
         embeddings = embedding_model.encode(komentar, show_progress_bar=False)
 
-        # Langkah 3: Lakukan clustering dengan BERTopic
         print("Memulai proses clustering...")
         topics, probabilities = topic_model.fit_transform(komentar, embeddings)
         
-        # Langkah 4: Proses hasil untuk dijadikan output JSON
         topic_info_df = topic_model.get_topic_info()
         hasil_list = []
 
         for index, row in topic_info_df.iterrows():
             topic_id = row['Topic']
-            # Kita abaikan cluster -1 karena itu adalah outlier (komentar yang tidak masuk ke grup manapun)
             if topic_id == -1:
                 continue
             
-            # Ambil 5 kata kunci teratas untuk setiap topik
             keywords = [word for word, score in topic_model.get_topic(topic_id)[:5]]
             
-            # Buat objek Pydantic untuk setiap topik
             topic_data = schemas.TopicResult(
                 cluster_id=topic_id,
                 jumlah_komentar=row['Count'],
@@ -472,7 +501,6 @@ async def cluster_comments(
             )
             hasil_list.append(topic_data)
 
-        # Siapkan payload akhir
         payload = schemas.ClusteringResponse(
             total_topik_ditemukan=len(hasil_list),
             hasil_clustering=hasil_list
@@ -484,4 +512,117 @@ async def cluster_comments(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Terjadi kesalahan saat proses clustering: {str(e)}"
+        )
+    
+def _semantic_similarity(text1, text2):
+    emb1 = embedding_model.encode(text1, convert_to_tensor=True)
+    emb2 = embedding_model.encode(text2, convert_to_tensor=True)
+    score = util.pytorch_cos_sim(emb1, emb2).item()
+    return round(score, 4)
+
+def _keyword_overlap(text1, text2):
+    try:
+        # Gunakan stop words multi-bahasa jika memungkinkan, atau hapus jika error
+        vectorizer = TfidfVectorizer() # Disederhanakan agar tidak error jika ada bahasa selain Inggris
+        tfidf_matrix = vectorizer.fit_transform([text1, text2])
+        vec1, vec2 = tfidf_matrix[0].toarray()[0], tfidf_matrix[1].toarray()[0]
+        overlap = sum((vec1 > 0) & (vec2 > 0))
+        union = sum((vec1 > 0) | (vec2 > 0))
+        return round(overlap / union, 4) if union != 0 else 0.0
+    except:
+        return 0.0
+
+def _entity_overlap(text1, text2):
+    try:
+        ents1 = set(ent.text.lower() for ent in nlp_ner(text1).ents)
+        ents2 = set(ent.text.lower() for ent in nlp_ner(text2).ents)
+        if not ents1 or not ents2: return 0.0
+        return round(len(ents1 & ents2) / len(ents1 | ents2), 4)
+    except:
+        return 0.0
+
+def _nli_score(premise, hypothesis):
+    try:
+        result = nli_pipeline(f"{premise} </s> {hypothesis}")[0]
+        label = result["label"].lower()
+        if label == "entailment": return 1.0
+        elif label == "neutral": return 0.5
+        else: return 0.0
+    except:
+        return 0.0
+
+def _interpret_score(score):
+    if score >= 0.67:
+        return "Sangat Mirip", 10
+    elif score >= 0.34:
+        return "Mirip", 5
+    else:
+        return "Tidak Mirip", 2
+
+# =================================================================
+# === ENDPOINT BARU UNTUK SEMANTIC SIMILARITY ===
+# =================================================================
+
+@app.post(
+    "/v1/similarity",
+    summary="Membandingkan kemiripan dua teks (ringkasan)",
+    response_model=StandardResponse[schemas.SimilarityResponse],
+    tags=["Similarity"]
+)
+async def evaluate_summary_endpoint(
+    # === PERUBAHAN UTAMA ADA DI SINI ===
+    # Input diubah dari JSON menjadi dua buah Form Data string
+    teks_admin: str = Form(..., description="Teks asli atau teks referensi dari admin."),
+    teks_user: str = Form(..., description="Teks ringkasan yang dibuat oleh user untuk dibandingkan.")
+    # ====================================
+):
+    """
+    Mengevaluasi kemiripan antara dua teks (misal: ringkasan admin vs user) 
+    menggunakan 4 metode:
+    - **Semantic Similarity**: Kemiripan makna keseluruhan.
+    - **Topic Match**: Tumpang tindih kata kunci penting.
+    - **Entity Overlap**: Tumpang tindih nama orang, tempat, dll.
+    - **NLI Entailment**: Apakah teks admin mendukung/membenarkan teks user.
+    """
+    if not all([embedding_model, nlp_ner, nli_pipeline]):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Salah satu model untuk semantic similarity gagal dimuat."
+        )
+
+    # Variabel 'teks_admin' dan 'teks_user' kini bisa langsung digunakan
+    admin_text = teks_admin
+    user_text = teks_user
+
+    try:
+        scores = schemas.SimilarityComponentScore(
+            semantic_similarity=_semantic_similarity(admin_text, user_text),
+            topic_match=_keyword_overlap(admin_text, user_text),
+            entity_overlap=_entity_overlap(admin_text, user_text),
+            nli_entailment=_nli_score(admin_text, user_text)
+        )
+
+        # Bobot skor akhir, sama seperti di notebook
+        final_score = round(
+            0.6 * scores.semantic_similarity +
+            0.3 * scores.topic_match +
+            0.05 * scores.entity_overlap +
+            0.05 * scores.nli_entailment, 4
+        )
+
+        label, poin = _interpret_score(final_score)
+
+        payload = schemas.SimilarityResponse(
+            skor_akhir=final_score,
+            label=label,
+            poin=poin,
+            skor_komponen=scores
+        )
+
+        return StandardResponse(message="Evaluasi kemiripan teks berhasil", payload=payload)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Terjadi kesalahan saat proses evaluasi: {str(e)}"
         )

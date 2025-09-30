@@ -151,3 +151,19 @@ class TopicResult(BaseModel):
 class ClusteringResponse(BaseModel):
     total_topik_ditemukan: int
     hasil_clustering: List[TopicResult]
+
+class SimilarityRequest(BaseModel):
+    teks_admin: str = Field(..., description="Teks asli atau teks referensi dari admin.")
+    teks_user: str = Field(..., description="Teks ringkasan yang dibuat oleh user untuk dibandingkan.")
+
+class SimilarityComponentScore(BaseModel):
+    semantic_similarity: float
+    topic_match: float
+    entity_overlap: float
+    nli_entailment: float
+
+class SimilarityResponse(BaseModel):
+    skor_akhir: float = Field(..., description="Skor kemiripan akhir antara 0.0 hingga 1.0")
+    label: str = Field(..., description="Interpretasi skor (Sangat Mirip, Mirip, Tidak Mirip)")
+    poin: int
+    skor_komponen: SimilarityComponentScore
