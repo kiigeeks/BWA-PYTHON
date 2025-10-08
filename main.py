@@ -37,6 +37,9 @@ from transformers import pipeline
 from sentence_transformers import SentenceTransformer
 from bertopic import BERTopic
 import pandas as pd 
+from sklearn.feature_extraction.text import CountVectorizer
+from umap import UMAP
+from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -460,8 +463,8 @@ async def cluster_comments(
 ):
     """
     Menerima list komentar dan melakukan topic modeling untuk menemukan cluster.
-    - **Input**: List berisi string komentar.
-    - **Output**: JSON berisi cluster yang ditemukan, lengkap dengan kata kunci dan contoh komentar utamanya.
+    - Input: List berisi string komentar.
+    - Output: JSON berisi cluster yang ditemukan, lengkap dengan kata kunci dan contoh komentar utamanya.
     """
     if embedding_model is None:
         raise HTTPException(
@@ -470,25 +473,72 @@ async def cluster_comments(
         )
 
     komentar = request.komentar
-    
-    try:
-        # Langkah 1: Inisialisasi BERTopic.
-        # min_topic_size bisa disesuaikan. Angka kecil akan menghasilkan lebih banyak topik spesifik.
-        topic_model = BERTopic(min_topic_size=3, verbose=False)
+    n_samples = len(komentar)
+    min_topic_size_config = 3 
 
-        # Langkah 2: Buat embeddings dari list komentar. Ini adalah proses yang intensif.
-        print(f"Membuat embeddings untuk {len(komentar)} komentar...")
+    # Validasi awal untuk jumlah data yang sangat minim
+    if n_samples <= min_topic_size_config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Proses clustering membutuhkan lebih dari {min_topic_size_config} komentar."
+        )
+
+    try:
+        topic_model = None
+
+        # 1. Siapkan stop words dari library Sastrawi untuk hasil yang lebih bersih
+        stop_word_factory = StopWordRemoverFactory()
+        stop_words_sastrawi = stop_word_factory.get_stop_words()
+        vectorizer_model = CountVectorizer(stop_words=stop_words_sastrawi)
+
+        # 2. Logika Mode Aman vs. Mode Standar
+        # Mode Aman untuk data < 15, menggunakan parameter UMAP yang disesuaikan
+        if n_samples < 15:
+            print(f"Jumlah sampel kecil ({n_samples}), menggunakan UMAP kustom yang aman.")
+            
+            # Menggunakan logika 'n_samples - 2' yang paling stabil
+            safe_n_neighbors = max(2, n_samples - 2)
+            safe_n_components = max(2, min(5, n_samples - 2)) 
+
+            print(f"Parameter UMAP: n_neighbors={safe_n_neighbors}, n_components={safe_n_components}")
+
+            umap_model = UMAP(
+                n_neighbors=safe_n_neighbors,
+                n_components=safe_n_components,
+                min_dist=0.0,
+                metric='cosine',
+                random_state=42
+            )
+            
+            topic_model = BERTopic(
+                umap_model=umap_model,
+                min_topic_size=min_topic_size_config, 
+                verbose=False,
+                vectorizer_model=vectorizer_model # Terapkan stop words
+            )
+        # Mode Standar untuk data >= 15, menggunakan default BERTopic
+        else:
+            print(f"Jumlah sampel cukup ({n_samples}), menggunakan pengaturan default BERTopic.")
+            topic_model = BERTopic(
+                min_topic_size=min_topic_size_config,
+                verbose=False,
+                vectorizer_model=vectorizer_model # Terapkan stop words
+            )
+
+        # 3. Proses embedding dan clustering
+        print(f"Membuat embeddings untuk {n_samples} komentar...")
         embeddings = embedding_model.encode(komentar, show_progress_bar=False)
 
         print("Memulai proses clustering...")
         topics, probabilities = topic_model.fit_transform(komentar, embeddings)
         
+        # 4. Format hasil untuk response JSON
         topic_info_df = topic_model.get_topic_info()
         hasil_list = []
 
         for index, row in topic_info_df.iterrows():
             topic_id = row['Topic']
-            if topic_id == -1:
+            if topic_id == -1: # Abaikan noise/outliers
                 continue
             
             keywords = [word for word, score in topic_model.get_topic(topic_id)[:5]]
@@ -509,6 +559,7 @@ async def cluster_comments(
         return StandardResponse(message="Clustering komentar berhasil", payload=payload)
 
     except Exception as e:
+        print(f"ERROR saat clustering: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Terjadi kesalahan saat proses clustering: {str(e)}"
