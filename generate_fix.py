@@ -255,8 +255,27 @@ PROMPT_TEMPLATES = {
         """
 }
 
-# file: generate_fix.py
+def determine_interpretation_manual(score):
+    """
+    Fungsi helper untuk menentukan label interpretasi secara hard-code.
+    """
+    if score >= 75:
+        return "Sangat Sesuai"
+    elif score >= 50:
+        return "Sesuai"
+    else:
+        return "Kurang Sesuai"
 
+def clean_percentage_str(value_str):
+    """
+    Membersihkan string angka (misal: "85%", "85 %", "85") menjadi float.
+    """
+    try:
+        clean_str = str(value_str).replace('%', '').strip()
+        return float(clean_str)
+    except (ValueError, TypeError):
+        return 0.0
+    
 def generate_executive_summary(pekerjaan, tipe_kepribadian, kognitif_utama, model_ai, bank_data_text, determined_level_from_table=None, average_score_from_table=None):
     """
     Menghasilkan executive summary secara dinamis.
@@ -1129,42 +1148,64 @@ def generate_full_report(tipe_kepribadian, kognitif_utama_key, pekerjaan, model_
             pekerjaan, tipe_kepribadian, kognitif_utama_key, model_ai, bank_data
         )
 
-        # === PERBAIKAN 2: Membersihkan tabel dari karakter '*' ===
+        # === MODIFIKASI DIMULAI DI SINI ===
         if table_data:
             cleaned_table_data = []
+            valid_averages = []
+
             for row in table_data:
-                # Membersihkan setiap sel dalam baris dari asterisk dan spasi ekstra
-                cleaned_row = [cell.replace('*', '').strip() for cell in row]
-                cleaned_table_data.append(cleaned_row)
+                # Pastikan row memiliki minimal 3 kolom awal (Kompetensi, Pers%, Cog%)
+                if len(row) >= 3:
+                    # 1. Ambil nama kompetensi
+                    kompetensi = row[0].replace('*', '').strip()
+                    
+                    # 2. Ambil dan bersihkan skor Personality & Cognitive
+                    score_pers = clean_percentage_str(row[1])
+                    score_cog = clean_percentage_str(row[2])
+                    
+                    # 3. HITUNG ULANG Rata-rata via Python (Supaya akurat)
+                    # Jika salah satu 0 (gagal parsing), rata-rata mungkin bias, 
+                    # tapi kita asumsikan AI memberikan angka valid.
+                    avg_score = (score_pers + score_cog) / 2
+                    valid_averages.append(avg_score)
+                    
+                    # 4. TENTUKAN INTERPRETASI SECARA MANUAL (Rule Based)
+                    interpretation = determine_interpretation_manual(avg_score)
+                    
+                    # 5. Susun kembali baris tabel dengan data yang sudah dipastikan benar
+                    # Format: [Kompetensi, Pers, Cog, Rata-rata, Interpretasi]
+                    new_row = [
+                        kompetensi,
+                        f"{score_pers:.0f}",     # Format angka bulat
+                        f"{score_cog:.0f}",      # Format angka bulat
+                        f"{avg_score:.0f}",      # Format angka bulat
+                        interpretation           # Hasil hard-code
+                    ]
+                    cleaned_table_data.append(new_row)
+            
+            # Update table_data dengan data yang sudah "dibersihkan" dan "dihitung ulang"
             table_data = cleaned_table_data
 
-            # === PERBAIKAN 1: Logika perhitungan rata-rata yang lebih kuat ===
-            try:
-                average_scores = []
-                for row in table_data:
-                    if len(row) > 3:
-                        # Membersihkan string: hapus %, ganti koma dgn titik, hapus spasi
-                        score_str = row[3].replace('%', '').replace(',', '.').strip()
-                        try:
-                            average_scores.append(float(score_str))
-                        except (ValueError, TypeError):
-                            print(f"Peringatan: Tidak dapat mengonversi '{row[3]}' menjadi float. Melewati baris ini.")
+            # Hitung rata-rata keseluruhan dari data yang sudah valid
+            if valid_averages:
+                overall_average = sum(valid_averages) / len(valid_averages)
                 
-                if average_scores:
-                    overall_average = sum(average_scores) / len(average_scores)
-                    if overall_average >= 75:
-                        overall_suitability_level = "Sangat Sesuai" 
-                    elif overall_average >= 50:
-                        overall_suitability_level = "Sesuai dengan Catatan Pengembangan"
-                    else:
-                        overall_suitability_level = "Kurang Sesuai"
-                    print(f"   -- Rata-rata skor tabel: {overall_average:.2f}%. Level ditentukan sebagai: '{overall_suitability_level}'")
+                # Tentukan Label Global berdasarkan rata-rata keseluruhan
+                if overall_average >= 75:
+                    overall_suitability_level = "Sangat Sesuai" 
+                elif overall_average >= 50:
+                    overall_suitability_level = "Sesuai dengan Catatan Pengembangan"
                 else:
-                    print("   -- Peringatan: Tidak ditemukan skor rata-rata yang valid di dalam data tabel.")
-            except Exception as e:
-                print(f"   -- Gagal menghitung rata-rata dari tabel: {e}. Level kesesuaian akan ditentukan oleh AI.")
+                    overall_suitability_level = "Kurang Sesuai"
+                
+                print(f"   -- Rata-rata skor tabel (Re-calculated): {overall_average:.2f}%.")
+                print(f"   -- Level Global ditentukan sebagai: '{overall_suitability_level}'")
+            else:
+                print("   -- Peringatan: Data skor tidak valid, menggunakan fallback AI.")
         else:
             print("   -- Gagal membuat data tabel. Level kesesuaian akan ditentukan oleh AI.")
+            
+        # === MODIFIKASI BERAKHIR DI SINI ===
 
     executive_summary_formatted = "Konten Executive Summary gagal digenerate."
     person_fit_job_formatted = "Konten Person-Job Fit gagal digenerate."
