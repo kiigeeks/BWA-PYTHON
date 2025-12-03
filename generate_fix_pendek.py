@@ -73,38 +73,105 @@ def extract_relevant_data(full_text, keywords):
 def generate_short_report_analysis(tipe_kepribadian, kognitif_utama, pekerjaan, model_ai, bank_data_text, suitability_level: Optional[str] = None, average_score: Optional[float] = None):
     print("\nMemulai analisis AI (Metode Dynamic Master Analysis)...")
     specific_context = extract_relevant_data(bank_data_text, [tipe_kepribadian, kognitif_utama])
-    prompt_suggestions_final = """
-        Berdasarkan analisis profil berikut, berikan 4 rekomendasi pengembangan diri.
-        ANALISIS: "{master_analysis}"
-        TUGAS: Tulis 4 rekomendasi pengembangan yang **singkat dan memberikan contoh nyata**.
-        INSTRUKSI WAJIB:
-        1.  Tulis dalam format daftar (4 poin).
-        2.  Setiap poin harus berupa kalimat perintah yang actionable.
-        3.  Berikan **contoh aktivitas spesifik** di setiap poin.
-        4.  Panjang setiap poin **sekitar 15-25 kata** agar jelas.
-        5.  **MUTLAK: Jangan menulis kalimat pembuka**. Langsung mulai dengan poin pertama.
-    """
+
+    # Fungsi pembersih list
     def clean_ai_list(text_list):
         return [line for line in text_list if not any(line.lower().strip().startswith(starter) for starter in ["berikut adalah", "inilah", "ini adalah", "berikut ini"])]
-    if not pekerjaan or not pekerjaan.strip():
-        return {"suitability": "Pertimbangan Berdasarkan Brain Wave Analysis", "position": "Analisis Profil Psikologis Umum", "reasons_title": "Pertimbangan:", "reasons": [], "suggestions": [], "tips": "Analisis umum."}
-    else:
-        prompt_master = f"Anda adalah seorang analis psikologi.\nTUGAS: Tulis analisis mendalam (2-3 paragraf) tentang profil kandidat untuk posisi yang ditentukan.\nPROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.\nPOSISI: {pekerjaan}.\nKONTEKS DATA:\n---\n{specific_context}\n---"
-        master_analysis = generate_ai_content(prompt_master, model=model_ai, task_name="Langkah 1: Master Analysis (Pekerjaan)")
-        determined_level = suitability_level or "SESUAI DENGAN CATATAN PENGEMBANGAN"
-        prompt_reasons = f'Berdasarkan teks analisis berikut, individu dinilai \'{determined_level}\' untuk pekerjaan tersebut.\nANALISIS: "{master_analysis}"\nTUGAS: Identifikasi 4 alasan utama berupa kekuatan atau sifat positif.\nINSTRUKSI:\n1. Tulis dalam format daftar singkat (4 poin).\n2. Setiap poin ringkas, maksimal 8 kata.\n3. Jangan sertakan kalimat pembuka/penutup.'
-        reasons_text = generate_ai_content(prompt_reasons, model=model_ai, task_name="Langkah 3: Ekstrak Alasan")
-        suggestions_text = generate_ai_content(prompt_suggestions_final.format(master_analysis=master_analysis), model=model_ai, task_name="Langkah 4: Ekstrak Saran")
-        prompt_tips = f"Berdasarkan analisis mendalam berikut, berikan satu saran praktis atau \"tips pamungkas\" untuk sukses dalam pekerjaannya.\nANALISIS: \"{master_analysis}\"\nTUGAS: Tuliskan dalam satu kalimat inspiratif, maksimal 20 kata."
-        tips_text = generate_ai_content(prompt_tips, model=model_ai, task_name="Langkah 5: Ekstrak Kesimpulan")
+
+    # ==========================================================
+    # KONDISI 1: JIKA PEKERJAAN KOSONG (General Profiling)
+    # ==========================================================
+    if not pekerjaan or not pekerjaan.strip() or pekerjaan.lower() in ['null', 'none', '-', 'string']:
+        print("   -> Mode: General Profiling (Analisis Kepribadian & Kognitif Umum)")
+
+        # 1. Pertimbangan (Kekuatan)
+        prompt_general_reasons = f"""
+        Anda adalah psikolog ahli.
+        PROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.
+        DATA: {specific_context}
+        
+        TUGAS: Identifikasi 4 KEKUATAN UTAMA (Pertimbangan Positif).
+        INSTRUKSI:
+        1. Tulis 4 poin singkat.
+        2. Maksimal 8 kata per poin.
+        3. Langsung poinnya saja.
+        """
+        reasons_text = generate_ai_content(prompt_general_reasons, model=model_ai, task_name="General - Kekuatan")
+
+        # 2. Area Pengembangan (Saran) - DIBATASI 12 KATA
+        prompt_general_suggestions = f"""
+        Berdasarkan profil {tipe_kepribadian} dan {kognitif_utama}, berikan 4 saran pengembangan diri.
+        INSTRUKSI KETAT:
+        1. Tulis 4 poin kalimat perintah actionable.
+        2. WAJIB: Maksimal 12 kata per kalimat. (Sangat Singkat).
+        3. Langsung tulis poinnya.
+        """
+        suggestions_text = generate_ai_content(prompt_general_suggestions, model=model_ai, task_name="General - Saran")
+
+        # 3. Tips
+        prompt_general_tips = f"""
+        Berikan satu kalimat motivasi singkat untuk profil {tipe_kepribadian}. Maksimal 15 kata.
+        """
+        tips_text = generate_ai_content(prompt_general_tips, model=model_ai, task_name="General - Tips")
+
+        # Bersihkan output
         reasons_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in reasons_text.split('\n') if line.strip()]
         suggestions_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in suggestions_text.split('\n') if line.strip()]
+
+        return {
+            "suitability": "Analisis Potensi Diri", 
+            "position": "General Profiling",
+            "reasons_title": "Pertimbangan (Kekuatan Utama):",
+            "reasons": clean_ai_list(reasons_cleaned)[:4],
+            "suggestions": clean_ai_list(suggestions_cleaned)[:4],
+            "tips": tips_text.strip()
+        }
+
+    # ==========================================================
+    # KONDISI 2: JIKA ADA PEKERJAAN (Specific Profiling)
+    # ==========================================================
+    else:
+        prompt_master = f"Anda adalah seorang analis psikologi.\nTUGAS: Tulis analisis mendalam (2-3 paragraf) tentang profil kandidat untuk posisi yang ditentukan.\nPROFIL: Kepribadian {tipe_kepribadian}, Kognitif {kognitif_utama}.\nPOSISI: {pekerjaan}.\nKONTEKS DATA:\n---\n{specific_context}\n---"
+        
+        master_analysis = generate_ai_content(prompt_master, model=model_ai, task_name="Langkah 1: Master Analysis (Pekerjaan)")
+        
+        determined_level = suitability_level or "SESUAI DENGAN CATATAN PENGEMBANGAN"
+        
+        # Pertimbangan (Alasan)
+        prompt_reasons = f'Berdasarkan analisis ini: "{master_analysis}"\nIdentifikasi 4 kekuatan utama untuk posisi tersebut.\nINSTRUKSI:\n1. 4 poin singkat.\n2. Maksimal 8 kata per poin.\n3. Langsung poinnya.'
+        reasons_text = generate_ai_content(prompt_reasons, model=model_ai, task_name="Langkah 3: Ekstrak Alasan")
+        
+        # Area Pengembangan (Saran) - DIBATASI 12 KATA
+        prompt_suggestions_final = f"""
+        Berdasarkan analisis berikut, berikan 4 rekomendasi pengembangan diri.
+        ANALISIS: "{master_analysis}"
+        INSTRUKSI KETAT:
+        1. Tulis 4 poin kalimat perintah.
+        2. WAJIB: Maksimal 12 kata per kalimat. (Harus Singkat).
+        3. Langsung poinnya.
+        """
+        suggestions_text = generate_ai_content(prompt_suggestions_final, model=model_ai, task_name="Langkah 4: Ekstrak Saran")
+        
+        prompt_tips = f"Berdasarkan analisis berikut: \"{master_analysis}\"\nBerikan satu tips pamungkas singkat.\nMaksimal 15 kata."
+        tips_text = generate_ai_content(prompt_tips, model=model_ai, task_name="Langkah 5: Ekstrak Kesimpulan")
+        
+        reasons_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in reasons_text.split('\n') if line.strip()]
+        suggestions_cleaned = [re.sub(r'^[-\*\d\.\s\\]+', '', line).strip() for line in suggestions_text.split('\n') if line.strip()]
+        
         final_suitability_text = determined_level
         if determined_level and average_score is not None:
             try:
                 final_suitability_text = f"{determined_level} ({average_score:.0f}%)"
             except (ValueError, TypeError): pass
-        return {"suitability": final_suitability_text, "position": pekerjaan, "reasons_title": "Pertimbangan :", "reasons": clean_ai_list(reasons_cleaned), "suggestions": clean_ai_list(suggestions_cleaned), "tips": tips_text.strip()}
+            
+        return {
+            "suitability": final_suitability_text, 
+            "position": pekerjaan, 
+            "reasons_title": "Pertimbangan:", 
+            "reasons": clean_ai_list(reasons_cleaned), 
+            "suggestions": clean_ai_list(suggestions_cleaned), 
+            "tips": tips_text.strip()
+        }
 
 def generate_job_fit_data(full_job_fit_html_text, model_ai):
     print("\nMemulai peringkasan AI untuk Rekomendasi Pekerjaan...")

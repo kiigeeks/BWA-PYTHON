@@ -155,6 +155,16 @@ async def analyze_edf(
 ):
     analysis_logger.info(f"===== REQUEST ANALISIS DITERIMA UNTUK USER: {username} =====")
 
+    if pekerjaan:
+        pekerjaan_bersih = pekerjaan.strip().lower()
+        if pekerjaan_bersih in ["", "null", "none", "-", "tidak ada"]:
+            pekerjaan = None
+        else:
+            pekerjaan = pekerjaan.strip()
+    
+    # Jika pekerjaan adalah None, log akan mencatatnya
+    analysis_logger.info(f"Status Pekerjaan setelah sanitisasi: {pekerjaan}")
+
     # --- TUGAS CEPAT 1: Validasi & Buat User (Tetap di sini) ---
     analysis_logger.info("[Langkah 1 & 2] Validasi dan registrasi user.")
     if get_user(db, username):
